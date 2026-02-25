@@ -1,0 +1,11 @@
+PyQt6
+psycopg2
+pandas
+openpyxl
+XlsxWriter
+reportlab
+matplotlib
+sphinx
+bcrypt
+python-dotenv
+#pip install -r requirements.txt
