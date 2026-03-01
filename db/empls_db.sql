@@ -8,6 +8,20 @@
 	
  );
 
+ CREATE TABLE IF NOT EXISTS users (
+     id SERIAL PRIMARY KEY,
+     username VARCHAR(50) NOT NULL UNIQUE,
+     password_hash VARCHAR(255) NOT NULL,
+     role VARCHAR(20) DEFAULT 'employee' CHECK (role IN ('admin', 'manager', 'employee')),
+     department_id INTEGER,
+     is_active BOOLEAN DEFAULT TRUE,
+     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+     last_login TIMESTAMP,
+     FOREIGN KEY (department_id)
+         REFERENCES departments(department_id)
+         ON DELETE SET NULL ON UPDATE CASCADE
+ );
+
  CREATE TABLE IF NOT EXISTS employees (
      employee_id INTEGER PRIMARY KEY,
      first_name TEXT NOT NULL,
@@ -42,6 +56,9 @@
      employee_id INTEGER NOT NULL,
      salary_amount NUMERIC(10, 2) CHECK (salary_amount >= 0),
      effective_date DATE NOT NULL,
+     payment_type VARCHAR(20) DEFAULT 'salary'
+         CHECK (payment_type IN ('salary', 'bonus', 'advance')),
+     description TEXT,
      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
      FOREIGN KEY (employee_id)
@@ -52,8 +69,11 @@
  CREATE TABLE IF NOT EXISTS projects (
      project_id INTEGER PRIMARY KEY,
      project_name TEXT NOT NULL,
+     description TEXT,
      start_date DATE NOT NULL,
      end_date DATE NOT NULL,
+     status VARCHAR(20) DEFAULT 'planning' CHECK (status IN ('planning', 'in_progress', 'on_hold', 'completed', 'cancelled')),
+     budget NUMERIC(12, 2) CHECK (budget >= 0),
      department_id INTEGER NOT NULL,
      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
