@@ -16,6 +16,12 @@
      gender CHAR(1) CHECK (gender IN ('М', 'Ж')),
      hire_date DATE NOT NULL,
      department_id INTEGER,
+     phone VARCHAR(20),
+     email VARCHAR(100),
+     inn VARCHAR(12),
+     snils VARCHAR(14),
+     passport VARCHAR(20),
+     status VARCHAR(10) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'fired')),
      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
      FOREIGN KEY (department_id)
