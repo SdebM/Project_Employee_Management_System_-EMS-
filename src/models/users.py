@@ -20,9 +20,10 @@
         print(user.is_admin)  # True
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 from enum import Enum
 
 
@@ -118,20 +119,35 @@ class User:
         }
 
     @classmethod
-    def from_db_row(cls, row: tuple) -> 'User':
+    def from_db_row(cls, row: Union[tuple, Mapping]) -> 'User':
         """Создаёт экземпляр из строки БД.
 
-        Ожидаемый порядок (SELECT * FROM users)::
+        Args:
+            row: Кортеж (позиционный доступ) или словарь
+                 (именованный доступ, например ``RealDictCursor``).
 
-            0  id
-            1  username
-            2  password_hash
-            3  role
-            4  department_id
-            5  is_active
-            6  created_at
-            7  last_login
+                 Ожидаемый порядок для кортежа (SELECT * FROM users)::
+
+                    0  id
+                    1  username
+                    2  password_hash
+                    3  role
+                    4  department_id
+                    5  is_active
+                    6  created_at
+                    7  last_login
         """
+        if isinstance(row, Mapping):
+            return cls(
+                id=row.get('id'),
+                username=row.get('username', ''),
+                password_hash=row.get('password_hash', ''),
+                role=row.get('role', 'employee'),
+                department_id=row.get('department_id'),
+                is_active=row.get('is_active', True),
+                created_at=row.get('created_at'),
+                last_login=row.get('last_login'),
+            )
         return cls(
             id=row[0],
             username=row[1] if len(row) > 1 else "",
