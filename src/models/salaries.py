@@ -20,9 +20,10 @@
     print(salary.formatted_amount)  # "50 000.00 ₽"
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, Union
 from decimal import Decimal
 
 
@@ -94,20 +95,36 @@ class Salary:
         }
 
     @classmethod
-    def from_db_row(cls, row: tuple) -> 'Salary':
+    def from_db_row(cls, row: Union[tuple, Mapping]) -> 'Salary':
         """Создаёт экземпляр из строки БД.
 
-        Ожидаемый порядок столбцов (SELECT * FROM salaries)::
+        Args:
+            row: Кортеж (позиционный доступ) или словарь
+                 (именованный доступ, например ``RealDictCursor``).
 
-            0  salary_id
-            1  employee_id
-            2  salary_amount
-            3  effective_date
-            4  payment_type
-            5  description
-            6  created_at
-            7  updated_at
+                 Ожидаемый порядок столбцов для кортежа (SELECT * FROM salaries)::
+
+                    0  salary_id
+                    1  employee_id
+                    2  salary_amount
+                    3  effective_date
+                    4  payment_type
+                    5  description
+                    6  created_at
+                    7  updated_at
         """
+        if isinstance(row, Mapping):
+            amount_raw = row.get('salary_amount')
+            return cls(
+                salary_id=row.get('salary_id'),
+                employee_id=row.get('employee_id', 0),
+                salary_amount=Decimal(str(amount_raw)) if amount_raw else Decimal("0.00"),
+                effective_date=row.get('effective_date'),
+                payment_type=row.get('payment_type') or 'salary',
+                description=row.get('description'),
+                created_at=row.get('created_at'),
+                updated_at=row.get('updated_at'),
+            )
         return cls(
             salary_id=row[0],
             employee_id=row[1],
