@@ -22,9 +22,10 @@
         )
         print(project.duration_days)  # 365
 """
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Optional, List
+from typing import Optional, List, Union
 from decimal import Decimal
 from enum import Enum
 
@@ -121,22 +122,40 @@ class Project:
         }
 
     @classmethod
-    def from_db_row(cls, row: tuple) -> 'Project':
+    def from_db_row(cls, row: Union[tuple, Mapping]) -> 'Project':
         """Создаёт экземпляр из строки БД.
 
-        Ожидаемый порядок (SELECT * FROM projects)::
+        Args:
+            row: Кортеж (позиционный доступ) или словарь
+                 (именованный доступ, например ``RealDictCursor``).
 
-            0  project_id
-            1  project_name
-            2  description
-            3  start_date
-            4  end_date
-            5  status
-            6  budget
-            7  department_id
-            8  created_at
-            9  updated_at
+                 Ожидаемый порядок для кортежа (SELECT * FROM projects)::
+
+                    0  project_id
+                    1  project_name
+                    2  description
+                    3  start_date
+                    4  end_date
+                    5  status
+                    6  budget
+                    7  department_id
+                    8  created_at
+                    9  updated_at
         """
+        if isinstance(row, Mapping):
+            budget_raw = row.get('budget')
+            return cls(
+                project_id=row.get('project_id'),
+                project_name=row.get('project_name', ''),
+                description=row.get('description'),
+                start_date=row.get('start_date'),
+                end_date=row.get('end_date'),
+                status=row.get('status') or 'planning',
+                budget=Decimal(str(budget_raw)) if budget_raw is not None else None,
+                department_id=row.get('department_id'),
+                created_at=row.get('created_at'),
+                updated_at=row.get('updated_at'),
+            )
         return cls(
             project_id=row[0],
             project_name=row[1],
