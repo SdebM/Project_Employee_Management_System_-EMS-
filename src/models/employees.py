@@ -26,10 +26,13 @@
         print(employee.full_name)  # "Иван Петров"
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, Union
 
+VALID_GENDERS = ('М', 'Ж')
+VALID_STATUSES = ('active', 'inactive', 'fired')
 
 @dataclass
 class Employee:
@@ -74,19 +77,19 @@ class Employee:
     updated_at: Optional[datetime] = None
 
     # Дополнительные поля для отображения (не хранятся в БД)
-    department_name: Optional[str] = field(default=None, repr=False)
-
-    _VALID_GENDERS = ('М', 'Ж')
-    _VALID_STATUSES = ('active', 'inactive', 'fired')
+    department_name: Optional[str] = field(default=None, repr=False, compare=False)
 
     def __post_init__(self):
         """Валидация и нормализация полей после инициализации."""
-        self._validate_choice('gender', self.gender, self._VALID_GENDERS)
-        self._validate_choice('status', self.status, self._VALID_STATUSES)
+        self._validate_choice('gender', self.gender, VALID_GENDERS)
+        self._validate_choice('status', self.status, VALID_STATUSES)
 
         # Нормализация строковых полей
         self.first_name = self.first_name.strip() if self.first_name else ""
         self.last_name = self.last_name.strip() if self.last_name else ""
+
+        if not self.first_name or not self.last_name:
+            raise ValueError("Имя и фамилия обязательны")
 
     @staticmethod
     def _validate_choice(field_name: str, value: str, valid_values: tuple) -> None:
@@ -138,6 +141,13 @@ class Employee:
             'passport': self.passport,
             'status': self.status
         }
+    
+    def to_safe_dict(self) -> dict:
+        """Словарь без конфиденциальных данных."""
+        d = self.to_dict()
+        for key in ('inn', 'snils', 'passport'):
+            d.pop(key, None)
+        return d
 
     def __str__(self) -> str:
         """Строковое представление сотрудника."""
@@ -149,11 +159,14 @@ class Employee:
         return ' | '.join(parts)
 
     @classmethod
-    def from_db_row(cls, row: tuple) -> 'Employee':
+    def from_db_row(cls, row: Union[tuple, Mapping]) -> 'Employee':
         """Создает экземпляр из строки БД.
 
         Args:
-            row: Кортеж с данными в порядке столбцов таблицы employees:
+            row: Кортеж (позиционный доступ) или словарь
+                 (именованный доступ, например ``RealDictCursor``).
+
+                 Порядок столбцов для кортежа:
                  (employee_id, first_name, last_name, date_of_birth, gender,
                   hire_date, department_id, phone, email, inn, snils, passport,
                   status, created_at, updated_at)
@@ -165,9 +178,26 @@ class Employee:
             Метод устойчив к неполным кортежам — отсутствующие
             поля получат значения по умолчанию.
         """
+        if isinstance(row, Mapping):
+            return cls(
+                employee_id=row.get('employee_id'),
+                first_name=row.get('first_name', ''),
+                last_name=row.get('last_name', ''),
+                date_of_birth=row.get('date_of_birth'),
+                gender=row.get('gender', 'М'),
+                hire_date=row.get('hire_date'),
+                department_id=row.get('department_id'),
+                phone=row.get('phone'),
+                email=row.get('email'),
+                inn=row.get('inn'),
+                snils=row.get('snils'),
+                passport=row.get('passport'),
+                status=row.get('status', 'active'),
+                created_at=row.get('created_at'),
+                updated_at=row.get('updated_at'),
+            )
         n = len(row)
         return cls(
-            employee_id=row[0],
             first_name=row[1],
             last_name=row[2],
             date_of_birth=row[3],
@@ -183,3 +213,5 @@ class Employee:
             created_at=row[13] if n > 13 else None,
             updated_at=row[14] if n > 14 else None,
         )
+    
+
