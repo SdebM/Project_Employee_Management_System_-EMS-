@@ -15,9 +15,10 @@
     )
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 
 
 @dataclass
@@ -61,17 +62,29 @@ class Department:
         }
 
     @classmethod
-    def from_db_row(cls, row: tuple) -> 'Department':
+    def from_db_row(cls, row: Union[tuple, Mapping]) -> 'Department':
         """Создаёт экземпляр из строки БД.
 
-        Ожидаемый порядок (SELECT * FROM departments)::
+        Args:
+            row: Кортеж (позиционный доступ) или словарь
+                 (именованный доступ, например ``RealDictCursor``).
 
-            0  department_id
-            1  department_name
-            2  manager_id
-            3  created_at
-            4  updated_at
+                 Ожидаемый порядок для кортежа (SELECT * FROM departments)::
+
+                    0  department_id
+                    1  department_name
+                    2  manager_id
+                    3  created_at
+                    4  updated_at
         """
+        if isinstance(row, Mapping):
+            return cls(
+                department_id=row.get('department_id'),
+                department_name=row.get('department_name', ''),
+                manager_id=row.get('manager_id'),
+                created_at=row.get('created_at'),
+                updated_at=row.get('updated_at'),
+            )
         return cls(
             department_id=row[0],
             department_name=row[1],
