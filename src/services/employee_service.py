@@ -1,0 +1,273 @@
+"""Сервис бизнес-логики для работы с сотрудниками.
+
+Содержит класс :class:`EmployeeService`, который инкапсулирует:
+
+- Проверку прав доступа перед операциями
+- Валидацию данных сотрудника
+- Фильтрацию по отделу для менеджеров
+- Аудит действий пользователей
+
+Основные методы:
+    - :meth:`get_employees` - получение списка
+    - :meth:`get_employee_by_id` - получение по ID
+    - :meth:`create_employee` - создание
+    - :meth:`update_employee` - обновление
+    - :meth:`delete_employee` - удаление
+
+
+"""
+
+from typing import List, Optional, Dict, Any
+from datetime import date
+import logging
+
+from models.employees import Employee
+from repositories.employee_repository import EmployeeRepository
+from core.database import Database
+from core.permissions import Permission, check_permission
+from core.exceptions import ValidationError, EntityNotFoundError
+
+
+class EmployeeService:
+    """Сервис для управления сотрудниками.
+    
+    Инкапсулирует бизнес-логику:
+    - Валидация данных
+    - Проверка прав доступа
+    - Фильтрация по ролям
+    - Аудит действий
+    
+    Пример использования:
+        service = EmployeeService(db)
+        employees = service.get_employees(current_user, {'status': 'active'})
+    """
+
+    def __init__(self, db: Database):
+        """
+        Args:
+            db: Объект подключения к БД
+        """
+        self._db = db
+        self._repository = EmployeeRepository(db)
+
+    @property
+    def db(self) -> Database:
+        """Возвращает объект БД (для диалогов)."""
+        return self._db
+
+    def get_employees(
+        self, 
+        user: dict, 
+        filters: Optional[Dict[str, Any]] = None
+    ) -> List[Employee]:
+        """Получает список сотрудников с учетом прав доступа.
+        
+        Args:
+            user: Данные текущего пользователя
+            filters: Фильтры поиска
+            
+        Returns:
+            Список сотрудников (для менеджеров - только из своего отдела)
+        """
+        check_permission(user, Permission.VIEW_EMPLOYEES)
+        
+        filters = filters or {}
+        
+        # Менеджеры видят только свой отдел
+        if user.get('role') == 'manager' and user.get('department_id'):
+            filters['department_id'] = user['department_id']
+        
+        return self._repository.get_all(filters)
+
+    def get_employee_by_id(self, user: dict, employee_id: int) -> Optional[Employee]:
+        """Получает сотрудника по ID.
+        
+        Args:
+            user: Данные текущего пользователя
+            employee_id: ID сотрудника
+            
+        Returns:
+            Объект Employee или None
+            
+        Raises:
+            PermissionDeniedError: Если нет прав на просмотр
+        """
+        check_permission(user, Permission.VIEW_EMPLOYEES)
+        
+        employee = self._repository.get_by_id(employee_id)
+        
+        if employee and user.get('role') == 'manager':
+            # Менеджер может видеть только сотрудников своего отдела
+            if employee.department_id != user.get('department_id'):
+                return None
+                
+        return employee
+
+    def create_employee(self, user: dict, data: Dict[str, Any]) -> int:
+        """Создает нового сотрудника.
+        
+        Args:
+            user: Данные текущего пользователя
+            data: Словарь с данными сотрудника
+            
+        Returns:
+            ID созданного сотрудника
+            
+        Raises:
+            ValidationError: При ошибках валидации
+            PermissionDeniedError: Если нет прав на создание
+        """
+        check_permission(user, Permission.CREATE_EMPLOYEE)
+        
+        # Валидация данных
+        self._validate_employee_data(data)
+        
+        # Создание объекта Employee
+        employee = Employee(
+            first_name=data['first_name'],
+            last_name=data['last_name'],
+            date_of_birth=data.get('date_of_birth'),
+            gender=data.get('gender', 'М'),
+            hire_date=data.get('hire_date', date.today()),
+            department_id=data.get('department_id'),
+            phone=data.get('phone'),
+            email=data.get('email'),
+            inn=data.get('inn'),
+            snils=data.get('snils'),
+            passport=data.get('passport'),
+            status='active'
+        )
+        
+        employee_id = self._repository.create(employee)
+        
+        # Логирование действия
+        self._db.log_action(
+            user['id'], 
+            'CREATE_EMPLOYEE', 
+            f"Создан сотрудник: {employee.full_name} (ID: {employee_id})"
+        )
+        
+        return employee_id
+
+    def update_employee(
+        self, 
+        user: dict, 
+        employee_id: int, 
+        data: Dict[str, Any]
+    ) -> bool:
+        """Обновляет данные сотрудника.
+        
+        Args:
+            user: Данные текущего пользователя
+            employee_id: ID сотрудника
+            data: Словарь с обновленными данными
+            
+        Returns:
+            True если обновление успешно
+            
+        Raises:
+            EntityNotFoundError: Если сотрудник не найден
+            ValidationError: При ошибках валидации
+        """
+        check_permission(user, Permission.EDIT_EMPLOYEE)
+        
+        employee = self._repository.get_by_id(employee_id)
+        if not employee:
+            raise EntityNotFoundError("Сотрудник", employee_id)
+        
+        # Валидация обновленных данных
+        self._validate_employee_data(data, is_update=True)
+        
+        # Обновление полей
+        for field, value in data.items():
+            if hasattr(employee, field):
+                setattr(employee, field, value)
+        
+        result = self._repository.update(employee)
+        
+        if result:
+            self._db.log_action(
+                user['id'],
+                'UPDATE_EMPLOYEE',
+                f"Обновлен сотрудник: {employee.full_name} (ID: {employee_id})"
+            )
+        
+        return result
+
+    def delete_employee(self, user: dict, employee_id: int) -> bool:
+        """Удаляет сотрудника.
+        
+        Args:
+            user: Данные текущего пользователя
+            employee_id: ID сотрудника
+            
+        Returns:
+            True если удаление успешно
+        """
+        check_permission(user, Permission.DELETE_EMPLOYEE)
+        
+        employee = self._repository.get_by_id(employee_id)
+        if not employee:
+            raise EntityNotFoundError("Сотрудник", employee_id)
+        
+        result = self._repository.delete(employee_id)
+        
+        if result:
+            self._db.log_action(
+                user['id'],
+                'DELETE_EMPLOYEE',
+                f"Удален сотрудник: {employee.full_name} (ID: {employee_id})"
+            )
+        
+        return result
+
+    def get_next_employee_id(self) -> int:
+        """Возвращает следующий доступный ID."""
+        return self._repository.get_next_id()
+
+    def get_employee_count_by_department(self) -> List[tuple]:
+        """Возвращает статистику по отделам."""
+        return self._repository.count_by_department()
+
+    def _validate_employee_data(self, data: dict, is_update: bool = False) -> None:
+        """Валидирует данные сотрудника.
+        
+        Args:
+            data: Словарь с данными
+            is_update: Флаг обновления (для частичной валидации)
+            
+        Raises:
+            ValidationError: При ошибках валидации
+        """
+        if not is_update:
+            # Обязательные поля при создании
+            if not data.get('first_name'):
+                raise ValidationError("Имя обязательно для заполнения", "first_name")
+            if not data.get('last_name'):
+                raise ValidationError("Фамилия обязательна для заполнения", "last_name")
+        
+        # Валидация возраста
+        if data.get('date_of_birth') and data.get('hire_date'):
+            age_at_hire = self._calculate_age(data['date_of_birth'], data['hire_date'])
+            if age_at_hire < 18:
+                raise ValidationError(
+                    "Сотруднику должно быть не менее 18 лет на момент приема",
+                    "date_of_birth"
+                )
+        
+        # Валидация email
+        if data.get('email') and '@' not in data['email']:
+            raise ValidationError("Некорректный формат email", "email")
+        
+        # Валидация телефона
+        if data.get('phone'):
+            phone = data['phone'].replace(' ', '').replace('-', '')
+            if not phone.replace('+', '').isdigit():
+                raise ValidationError("Некорректный формат телефона", "phone")
+
+    def _calculate_age(self, birth_date: date, reference_date: date) -> int:
+        """Вычисляет возраст на указанную дату."""
+        age = reference_date.year - birth_date.year
+        if (reference_date.month, reference_date.day) < (birth_date.month, birth_date.day):
+            age -= 1
+        return age
