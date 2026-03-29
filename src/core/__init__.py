@@ -12,10 +12,14 @@
 from .database import Database
 from .config import Config
 from .exceptions import (
-    AppException, DatabaseError
+    AppException, DatabaseError, ValidationError,
+    AuthenticationError, PermissionDeniedError
 )
+from .permissions import PermissionManager, check_permission
 
 __all__ = [
     'Database', 'Config',
-    'AppException', 'DatabaseError'
+    'AppException', 'DatabaseError', 'ValidationError',
+    'AuthenticationError', 'PermissionDeniedError',
+    'PermissionManager', 'check_permission'
 ]
