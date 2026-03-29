@@ -1,0 +1,151 @@
+"""Репозиторий для работы с отделами."""
+
+from typing import List, Optional, Dict, Any
+from .base_repository import BaseRepository
+from models.departments import Department
+from core.database import Database
+
+
+class DepartmentRepository(BaseRepository[Department]):
+    """Репозиторий для CRUD-операций с отделами."""
+
+    def __init__(self, db: Database):
+        super().__init__(db, 'departments')
+
+    def _map_to_entity(self, row: tuple) -> Department:
+        """Преобразует строку БД в объект Department."""
+        return Department.from_db_row(row)
+
+    def _entity_to_params(self, entity: Department) -> tuple:
+        """Преобразует Department в параметры SQL."""
+        return (
+            entity.department_name,
+            entity.manager_id
+        )
+
+    def get_all(self, filters: Optional[Dict[str, Any]] = None) -> List[Department]:
+        """Получает список отделов с информацией о количестве сотрудников.
+        
+        Args:
+            filters: Фильтры поиска:
+                - department_name (str): Поиск по названию (ILIKE)
+                
+        Returns:
+            Список объектов Department
+        """
+        query = """
+            SELECT 
+                d.department_id, d.department_name,
+                d.manager_id, d.created_at, d.updated_at,
+                CONCAT(e.first_name, ' ', e.last_name) as manager_name,
+                (SELECT COUNT(*) FROM employees WHERE department_id = d.department_id) as emp_count
+            FROM departments d
+            LEFT JOIN employees e ON d.manager_id = e.employee_id
+            WHERE 1=1
+        """
+        params = []
+
+        if filters:
+            if filters.get('department_name'):
+                query += " AND d.department_name ILIKE %s"
+                params.append(f"%{filters['department_name']}%")
+
+        query += " ORDER BY d.department_name"
+
+        rows = self._db.fetch_all(query, tuple(params))
+        departments = []
+        for row in rows:
+            dept = Department.from_db_row(row[:5])
+            dept.manager_name = row[5] if len(row) > 5 else None
+            dept.employee_count = row[6] if len(row) > 6 else 0
+            departments.append(dept)
+        return departments
+
+    def get_by_id(self, department_id: int) -> Optional[Department]:
+        """Получает отдел по ID."""
+        query = """
+            SELECT 
+                d.department_id, d.department_name,
+                d.manager_id, d.created_at, d.updated_at,
+                CONCAT(e.first_name, ' ', e.last_name) as manager_name
+            FROM departments d
+            LEFT JOIN employees e ON d.manager_id = e.employee_id
+            WHERE d.department_id = %s
+        """
+        row = self._db.fetch_one(query, (department_id,))
+        if row:
+            dept = Department.from_db_row(row[:5])
+            dept.manager_name = row[5] if len(row) > 5 else None
+            return dept
+        return None
+
+    def create(self, department: Department) -> int:
+        """Создает новый отдел.
+        
+        Returns:
+            ID созданного отдела
+        """
+        query = """
+            INSERT INTO departments (department_name, manager_id)
+            VALUES (%s, %s)
+            RETURNING department_id
+        """
+        params = self._entity_to_params(department)
+        result = self._db.execute_query(query, params, return_result=True)
+        return result[0][0] if result else None
+
+    def update(self, department: Department) -> bool:
+        """Обновляет данные отдела."""
+        query = """
+            UPDATE departments SET
+                department_name = %s, 
+                manager_id = %s, updated_at = NOW()
+            WHERE department_id = %s
+        """
+        params = self._entity_to_params(department) + (department.department_id,)
+        return self._db.execute_query(query, params)
+
+    def delete(self, department_id: int) -> bool:
+        """Удаляет отдел."""
+        query = "DELETE FROM departments WHERE department_id = %s"
+        return self._db.execute_query(query, (department_id,))
+
+    def get_for_dropdown(self) -> List[tuple]:
+        """Возвращает список отделов для выпадающего списка.
+        
+        Returns:
+            Список кортежей (department_id, department_name)
+        """
+        query = """
+            SELECT department_id, department_name 
+            FROM departments 
+            ORDER BY department_name
+        """
+        return self._db.fetch_all(query)
+
+    def get_department_statistics(self) -> List[Dict]:
+        """Возвращает статистику по отделам.
+        
+        Returns:
+            Список словарей со статистикой
+        """
+        query = """
+            SELECT 
+                d.department_name,
+                COUNT(e.employee_id) as employee_count,
+                COALESCE(SUM(s.amount), 0) as total_salary
+            FROM departments d
+            LEFT JOIN employees e ON d.department_id = e.department_id
+            LEFT JOIN salaries s ON e.employee_id = s.employee_id
+            GROUP BY d.department_id, d.department_name
+            ORDER BY d.department_name
+        """
+        rows = self._db.fetch_all(query)
+        return [
+            {
+                'department_name': row[0],
+                'employee_count': row[1],
+                'total_salary': float(row[2]) if row[2] else 0
+            }
+            for row in rows
+        ]
