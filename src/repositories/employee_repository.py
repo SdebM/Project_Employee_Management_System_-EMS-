@@ -138,9 +138,9 @@ class EmployeeRepository(BaseRepository[Employee]):
             INSERT INTO employees (
                 first_name, last_name, date_of_birth, gender, 
                 hire_date, department_id, phone, email, 
-                inn, passport, status
+                inn, snils, passport, status
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING employee_id
         """
         params = self._entity_to_params(employee)
@@ -160,7 +160,7 @@ class EmployeeRepository(BaseRepository[Employee]):
             UPDATE employees SET
                 first_name = %s, last_name = %s, date_of_birth = %s,
                 gender = %s, hire_date = %s, department_id = %s,
-                phone = %s, email = %s, inn = %s, passport = %s,
+                phone = %s, email = %s, inn = %s, snils = %s, passport = %s,
                 status = %s, updated_at = NOW()
             WHERE employee_id = %s
         """

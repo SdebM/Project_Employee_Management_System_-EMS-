@@ -1,173 +1,219 @@
-"""Система контроля доступа и разрешений.
+"""Система управления правами доступа.
 
-Содержит:
-    - :class:`Permission` - перечисление разрешений
-    - :func:`check_permission` - проверка прав доступа
-    - :func:`get_user_permissions` - получение всех разрешений пользователя
+Модуль реализует Role-Based Access Control (RBAC):
 
-Логика доступа:
-    - ``admin`` - полный доступ ко всему (``'all'``)
-    - ``manager`` - управление подчиненными и отчеты
-    - ``employee`` - просмотр только своих данных
+- :class:`Permission` - константы разрешений
+- :data:`ROLE_PERMISSIONS` - матрица прав по ролям
+- :class:`PermissionManager` - проверка прав пользователя
+- :func:`check_permission` - функция проверки с исключением
+- :func:`require_permission` - декоратор для методов
 
-Пример:
+Роли системы:
+    - **admin** - полный доступ ко всем операциям
+    - **manager** - просмотр и экспорт данных своего отдела
+    - **employee** - только просмотр общих данных
+
+Пример использования:
     ::
     
-        user = {'role': 'manager', 'department_id': 5}
-        check_permission(user, Permission.VIEW_EMPLOYEES)  # OK
-        check_permission(user, Permission.DELETE_EMPLOYEE)  # Raises PermissionDeniedError
+        from core.permissions import Permission, check_permission, PermissionManager
+        
+        # Проверка через функцию (вызывает исключение)
+        check_permission(user, Permission.CREATE_EMPLOYEE)
+        
+        # Проверка через менеджер
+        pm = PermissionManager(user)
+        if pm.has_permission(Permission.EDIT_EMPLOYEE):
+            # выполнить редактирование
+            pass
+
+См. также:
+    - :mod:`core.exceptions` - исключение PermissionDeniedError
+    - :mod:`services` - использование в сервисах
 """
 
-from enum import Enum
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Optional
+from functools import wraps
+from .exceptions import PermissionDeniedError
 
-from core.exceptions import PermissionDeniedError
 
-
-class Permission(Enum):
-    """Перечисление разрешений в системе."""
-    
-    # Права на сотрудников
+class Permission:
+    """Константы разрешений."""
+    # Сотрудники
     VIEW_EMPLOYEES = "view_employees"
     CREATE_EMPLOYEE = "create_employee"
     EDIT_EMPLOYEE = "edit_employee"
     DELETE_EMPLOYEE = "delete_employee"
-    
-    # Права на отделы
+    VIEW_CONFIDENTIAL = "view_confidential"  # ИНН, паспорт
+
+    # Отделы
     VIEW_DEPARTMENTS = "view_departments"
     CREATE_DEPARTMENT = "create_department"
     EDIT_DEPARTMENT = "edit_department"
     DELETE_DEPARTMENT = "delete_department"
-    
-    # Права на проекты
+
+    # Проекты
     VIEW_PROJECTS = "view_projects"
     CREATE_PROJECT = "create_project"
     EDIT_PROJECT = "edit_project"
     DELETE_PROJECT = "delete_project"
-    
-    # Права на зарплаты
+
+    # Зарплаты
     VIEW_SALARIES = "view_salaries"
-    EDIT_SALARIES = "edit_salaries"
-    
-    # Права на пользователей
-    MANAGE_USERS = "manage_users"
-    
-    # Права на экспорт и аналитику
-    EXPORT_DATA = "export_data"
+    CREATE_SALARY = "create_salary"
+    EDIT_SALARY = "edit_salary"
+    DELETE_SALARY = "delete_salary"
+
+    # Аналитика
     VIEW_ANALYTICS = "view_analytics"
-    
-    # Право на просмотр своих данных
-    VIEW_OWN_DATA = "view_own_data"
+    EXPORT_DATA = "export_data"
+
+    # Пользователи
+    VIEW_USERS = "view_users"
+    CREATE_USER = "create_user"
+    EDIT_USER = "edit_user"
+    DELETE_USER = "delete_user"
 
 
 # Матрица разрешений по ролям
 ROLE_PERMISSIONS: Dict[str, Set[str]] = {
-    'admin': {'all'},  # Администратор имеет доступ ко всему
+    'admin': {
+        # Полный доступ ко всему
+        Permission.VIEW_EMPLOYEES, Permission.CREATE_EMPLOYEE,
+        Permission.EDIT_EMPLOYEE, Permission.DELETE_EMPLOYEE,
+        Permission.VIEW_CONFIDENTIAL,
+        Permission.VIEW_DEPARTMENTS, Permission.CREATE_DEPARTMENT,
+        Permission.EDIT_DEPARTMENT, Permission.DELETE_DEPARTMENT,
+        Permission.VIEW_PROJECTS, Permission.CREATE_PROJECT,
+        Permission.EDIT_PROJECT, Permission.DELETE_PROJECT,
+        Permission.VIEW_SALARIES, Permission.CREATE_SALARY,
+        Permission.EDIT_SALARY, Permission.DELETE_SALARY,
+        Permission.VIEW_ANALYTICS, Permission.EXPORT_DATA,
+        Permission.VIEW_USERS, Permission.CREATE_USER,
+        Permission.EDIT_USER, Permission.DELETE_USER,
+    },
     'manager': {
-        Permission.VIEW_EMPLOYEES.value,
-        Permission.VIEW_DEPARTMENTS.value,
-        Permission.VIEW_PROJECTS.value,
-        Permission.VIEW_SALARIES.value,
-        Permission.EXPORT_DATA.value,
-        Permission.VIEW_ANALYTICS.value,
+        # Просмотр и экспорт, без конфиденциальных данных
+        Permission.VIEW_EMPLOYEES,
+        Permission.VIEW_DEPARTMENTS,
+        Permission.VIEW_PROJECTS,
+        Permission.VIEW_ANALYTICS,
+        Permission.EXPORT_DATA,
     },
     'employee': {
-        Permission.VIEW_OWN_DATA.value,
-    },
+        # Только просмотр своих данных
+        Permission.VIEW_EMPLOYEES,
+    }
 }
 
 
-def get_user_permissions(user: dict) -> Set[str]:
-    """Получает набор разрешений для пользователя.
+class PermissionManager:
+    """Менеджер проверки прав доступа.
+    
+    Attributes:
+        user: Данные текущего пользователя
+        
+    Пример использования:
+        pm = PermissionManager(current_user)
+        if pm.has_permission(Permission.CREATE_EMPLOYEE):
+            # создание сотрудника
+    """
+
+    def __init__(self, user: dict):
+        """
+        Args:
+            user: Словарь с данными пользователя:
+                - role (str): Роль пользователя
+                - department_id (int | None): ID отдела
+        """
+        self.user = user
+        self.role = user.get('role', 'employee')
+        self.department_id = user.get('department_id')
+
+    def has_permission(self, permission: str) -> bool:
+        """Проверяет наличие разрешения у пользователя.
+        
+        Args:
+            permission: Строка разрешения из класса Permission
+            
+        Returns:
+            True если разрешение есть, иначе False
+        """
+        role_perms = ROLE_PERMISSIONS.get(self.role, set())
+        return permission in role_perms
+
+    def check_permission(self, permission: str) -> None:
+        """Проверяет разрешение и выбрасывает исключение при отказе.
+        
+        Args:
+            permission: Строка разрешения
+            
+        Raises:
+            PermissionDeniedError: Если нет разрешения
+        """
+        if not self.has_permission(permission):
+            raise PermissionDeniedError(
+                f"Недостаточно прав для операции: {permission}"
+            )
+
+    def get_allowed_tabs(self) -> List[int]:
+        """Возвращает индексы доступных вкладок.
+        
+        Returns:
+            Список индексов вкладок для текущей роли
+        """
+        tabs_by_role = {
+            'admin': [0, 1, 2, 3, 4, 5],  # Все вкладки
+            'manager': [0, 1, 2, 4],       # Сотр, Отд, Проекты, Аналитика
+            'employee': [0]                 # Только Сотрудники
+        }
+        return tabs_by_role.get(self.role, [])
+
+    def filter_by_department(self, query_params: dict) -> dict:
+        """Добавляет фильтр по отделу для менеджеров.
+        
+        Args:
+            query_params: Параметры запроса
+            
+        Returns:
+            Обновленные параметры с фильтром отдела
+        """
+        if self.role == 'manager' and self.department_id:
+            query_params['department_id'] = self.department_id
+        return query_params
+
+
+def check_permission(user: dict, permission: str) -> None:
+    """Функция-хелпер для проверки разрешения.
     
     Args:
-        user: Словарь с данными пользователя (поля: role, is_active, ...)
-        
-    Returns:
-        Множество строк разрешений пользователя
+        user: Данные пользователя
+        permission: Требуемое разрешение
         
     Raises:
-        ValueError: Если роль пользователя не найдена
+        PermissionDeniedError: Если нет разрешения
     """
-    if not user.get('is_active', False):
-        return set()
-    
-    role = user.get('role', 'employee')
-    
-    if role not in ROLE_PERMISSIONS:
-        raise ValueError(f"Неизвестная роль: {role}")
-    
-    return ROLE_PERMISSIONS[role].copy()
+    pm = PermissionManager(user)
+    pm.check_permission(permission)
 
 
-def check_permission(user: dict, permission: Permission) -> bool:
-    """Проверяет наличие разрешения у пользователя.
-    
-    Администратор имеет доступ ко всему (возвращает True на любое разрешение).
+def require_permission(permission: str):
+    """Декоратор для проверки разрешений на уровне метода.
     
     Args:
-        user: Словарь с данными пользователя (поля: role, is_active, ...)
-        permission: Объект Permission для проверки
-        
-    Returns:
-        True если пользователь имеет разрешение
-        
-    Raises:
-        PermissionDeniedError: Если пользователь не имеет разрешение
-        ValueError: Если роль пользователя неизвестна
+        permission: Требуемое разрешение
         
     Пример:
-        ::
-        
-            user = {'role': 'manager', 'is_active': True}
-            check_permission(user, Permission.VIEW_EMPLOYEES)  # OK
+        @require_permission(Permission.CREATE_EMPLOYEE)
+        def add_employee(self, user, data):
+            ...
     """
-    if not user.get('is_active', False):
-        raise PermissionDeniedError(
-            f"Доступ запрещен: пользователь неактивен"
-        )
-    
-    role = user.get('role', 'employee')
-    
-    if role not in ROLE_PERMISSIONS:
-        raise ValueError(f"Неизвестная роль: {role}")
-    
-    user_permissions = ROLE_PERMISSIONS[role]
-    
-    # Администратор имеет доступ ко всему
-    if 'all' in user_permissions:
-        return True
-    
-    permission_value = permission.value
-    
-    if permission_value not in user_permissions:
-        raise PermissionDeniedError(
-            f"Доступ запрещен: требуется разрешение '{permission_value}', "
-            f"роль '{role}' не имеет этого разрешения"
-        )
-    
-    return True
-
-
-def has_permission(user: dict, permission: Permission) -> bool:
-    """Проверяет наличие разрешения (мягкая версия, без исключений).
-    
-    Args:
-        user: Словарь с данными пользователя
-        permission: Объект Permission для проверки
-        
-    Returns:
-        True если пользователь имеет разрешение, иначе False
-        
-    Пример:
-        ::
-        
-            if has_permission(user, Permission.DELETE_EMPLOYEE):
-                # Показать кнопку удаления
-            else:
-                # Скрыть кнопку удаления
-    """
-    try:
-        return check_permission(user, permission)
-    except (PermissionDeniedError, ValueError):
-        return False
+    def decorator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            user = kwargs.get('user') or (args[0] if args else None)
+            if user:
+                check_permission(user, permission)
+            return func(self, *args, **kwargs)
+        return wrapper
+    return decorator

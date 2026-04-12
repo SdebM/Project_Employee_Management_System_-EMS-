@@ -46,7 +46,6 @@ class DepartmentService:
         
         department = Department(
             department_name=data['department_name'],
-            description=data.get('description'),
             manager_id=data.get('manager_id')
         )
         

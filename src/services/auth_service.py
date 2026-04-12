@@ -3,7 +3,7 @@
 Содержит класс :class:`AuthService` для:
 
 - Проверки учётных данных
-- Хеширования паролей (MD5)
+- Хеширования паролей (bcrypt)
 - Управления пользователями
 - Обновления даты последнего входа
 
@@ -169,7 +169,6 @@ class AuthService:
         Returns:
             True если изменение успешно
         """
-        user = self._repository.get_by_username(None)  # fallback
         # Получаем пользователя по ID с паролем
         row = self._db.fetch_one(
             "SELECT id, username, password_hash, role, department_id, is_active "

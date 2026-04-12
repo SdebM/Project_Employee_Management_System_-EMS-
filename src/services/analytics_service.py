@@ -37,7 +37,7 @@ class AnalyticsService:
         query = """
             SELECT d.department_name, COUNT(e.employee_id) as count
             FROM departments d
-            LEFT JOIN departments e ON d.department_id = e.department_id
+            LEFT JOIN employees e ON d.department_id = e.department_id
             GROUP BY d.department_id, d.department_name
             ORDER BY count DESC
         """
@@ -62,10 +62,10 @@ class AnalyticsService:
 
         query = """
             SELECT
-                DATE_TRUNC('month', payment_date) as month,
-                SUM(amount) as total
+                DATE_TRUNC('month', effective_date) as month,
+                SUM(salary_amount) as total
             FROM salaries
-            WHERE payment_date >= NOW() - INTERVAL '1 month' * %s
+            WHERE effective_date >= NOW() - INTERVAL '1 month' * %s
             GROUP BY month
             ORDER BY month
         """
