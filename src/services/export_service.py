@@ -88,7 +88,7 @@ class ExportService:
             )
 
             elements = []
-            elements.append(Paragraph(document_title, styles['Title']))
+            elements.append(Paragraph(document_title, styles['CustomTitle']))
             elements.append(Spacer(1, 5 * mm))
 
             # Создание таблицы
@@ -199,7 +199,7 @@ class ExportService:
         styles = getSampleStyleSheet()
         
         styles.add(ParagraphStyle(
-            name='Title',
+            name='CustomTitle',
             fontName=font_name,
             fontSize=16,
             alignment=1,
@@ -207,14 +207,14 @@ class ExportService:
         ))
         
         styles.add(ParagraphStyle(
-            name='Header',
+            name='CustomHeader',
             fontName=font_name,
             fontSize=10,
             alignment=1
         ))
         
         styles.add(ParagraphStyle(
-            name='Body',
+            name='CustomBody',
             fontName=font_name,
             fontSize=9,
             alignment=1
@@ -229,7 +229,7 @@ class ExportService:
         for col in range(table_widget.columnCount()):
             header = table_widget.horizontalHeaderItem(col)
             text = header.text() if header else ""
-            headers.append(Paragraph(f"<b>{text}</b>", styles['Header']))
+            headers.append(Paragraph(f"<b>{text}</b>", styles['CustomHeader']))
 
         table_data = [headers]
         
@@ -238,7 +238,7 @@ class ExportService:
             for col in range(table_widget.columnCount()):
                 item = table_widget.item(row, col)
                 text = item.text() if item else ""
-                row_data.append(Paragraph(text, styles['Body']))
+                row_data.append(Paragraph(text, styles['CustomBody']))
             table_data.append(row_data)
 
         return headers, table_data

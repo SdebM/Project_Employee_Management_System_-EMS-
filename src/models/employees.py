@@ -198,6 +198,7 @@ class Employee:
             )
         n = len(row)
         return cls(
+            employee_id=row[0],
             first_name=row[1],
             last_name=row[2],
             date_of_birth=row[3],

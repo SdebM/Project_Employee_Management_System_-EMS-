@@ -99,8 +99,8 @@ class EmployeeRepository(BaseRepository[Employee]):
         rows = self._db.fetch_all(query, tuple(params))
         employees = []
         for row in rows:
-            emp = Employee.from_db_row(row[:14])
-            emp.department_name = row[14] if len(row) > 14 else None
+            emp = Employee.from_db_row(row[:15])
+            emp.department_name = row[15] if len(row) > 15 else None
             employees.append(emp)
         return employees
 
@@ -120,8 +120,8 @@ class EmployeeRepository(BaseRepository[Employee]):
         """
         row = self._db.fetch_one(query, (employee_id,))
         if row:
-            emp = Employee.from_db_row(row[:14])
-            emp.department_name = row[14] if len(row) > 14 else None
+            emp = Employee.from_db_row(row[:15])
+            emp.department_name = row[15] if len(row) > 15 else None
             return emp
         return None
 

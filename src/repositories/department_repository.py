@@ -133,7 +133,7 @@ class DepartmentRepository(BaseRepository[Department]):
             SELECT 
                 d.department_name,
                 COUNT(e.employee_id) as employee_count,
-                COALESCE(SUM(s.amount), 0) as total_salary
+                COALESCE(SUM(s.salary_amount), 0) as total_salary
             FROM departments d
             LEFT JOIN employees e ON d.department_id = e.department_id
             LEFT JOIN salaries s ON e.employee_id = s.employee_id

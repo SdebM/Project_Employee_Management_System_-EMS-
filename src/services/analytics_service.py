@@ -23,7 +23,7 @@ class AnalyticsService:
     def __init__(self, db: Database):
         self._db = db
 
-    def get_employee_departament(self, user:dict) -> List[Dict[str, Any]]:
+    def get_employee_department(self, user:dict) -> List[Dict[str, Any]]:
         """Возвращает количество сотрудников по отделам.
         
         Args:
@@ -48,7 +48,7 @@ class AnalyticsService:
             for row in rows
         ]
     
-    def get_salary_dynamics(self, user:dict, month:int = 12) -> List[Dict[str, Any]]:
+    def get_salary_dynamics(self, user:dict, months:int = 12) -> List[Dict[str, Any]]:
         """Возвращает динамику выплат по месяцам.
         
         Args:
@@ -70,7 +70,7 @@ class AnalyticsService:
             ORDER BY month
         """
 
-        rows = self._db.fetch_all(query, (month,))
+        rows = self._db.fetch_all(query, (months,))
         return [
             {
                 'month': row[0].strftime('%Y-%m') if row[0] else '',
@@ -88,13 +88,7 @@ class AnalyticsService:
         check_permission(user, Permission.VIEW_ANALYTICS)
         
         query = """
-            SELECT 
-                CASE 
-                    WHEN end_date < CURRENT_DATE THEN 'completed'
-                    WHEN start_date > CURRENT_DATE THEN 'planning'
-                    ELSE 'in_progress'
-                END as status,
-                COUNT(*) as count
+            SELECT status, COUNT(*) as count
             FROM projects
             GROUP BY status
             ORDER BY count DESC

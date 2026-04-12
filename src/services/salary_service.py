@@ -41,8 +41,8 @@ class SalaryService:
         
         salary = Salary(
             employee_id=data['employee_id'],
-            amount=Decimal(str(data['amount'])),
-            payment_date=data.get('payment_date', date.today()),
+            salary_amount=Decimal(str(data['amount'])),
+            effective_date=data.get('effective_date', date.today()),
             payment_type=data.get('payment_type', 'salary'),
             description=data.get('description')
         )
@@ -137,6 +137,6 @@ class SalaryService:
             except (ValueError, TypeError, ArithmeticError):
                 raise ValidationError("Некорректный формат суммы", "amount")
         
-        valid_types = ['salary', 'bonus', 'advance', 'compensation']
+        valid_types = ['salary', 'bonus', 'advance']
         if data.get('payment_type') and data['payment_type'] not in valid_types:
             raise ValidationError(f"Недопустимый тип выплаты", "payment_type")

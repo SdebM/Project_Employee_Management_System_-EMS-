@@ -50,6 +50,7 @@ class Salary:
     salary_amount: Decimal = Decimal("0.00")
     effective_date: Optional[date] = None
     payment_type: str = "salary"
+    description: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

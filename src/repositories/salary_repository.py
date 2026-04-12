@@ -147,7 +147,7 @@ class SalaryRepository(BaseRepository[Salary]):
                 DATE_TRUNC('month', effective_date) as month,
                 SUM(salary_amount) as total
             FROM salaries
-            WHERE effective_date >= NOW() - INTERVAL '%s months'
+            WHERE effective_date >= NOW() - INTERVAL '1 month' * %s
             GROUP BY month
             ORDER BY month
         """

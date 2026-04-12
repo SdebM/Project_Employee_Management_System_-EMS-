@@ -66,7 +66,7 @@ class UserRepository(BaseRepository[User]):
             user = User(
                 id=row[0],
                 username=row[1],
-                password_hash="",  # Не выбираем пароли для безоапсности
+                password_hash="",  # Не выбираем пароли для безопасности
                 role=row[2],
                 department_id=row[3],
                 is_active=row[4],
@@ -87,7 +87,7 @@ class UserRepository(BaseRepository[User]):
             return User(
                 id=row[0],
                 username=row[1],
-                password_hash="",  # Не выбираем пароль для безоапсности
+                password_hash="",  # Не выбираем пароль для безопасности
                 role=row[2],
                 department_id=row[3],
                 is_active=row[4],
