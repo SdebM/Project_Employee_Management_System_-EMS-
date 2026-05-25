@@ -92,6 +92,9 @@ class Salary:
             'effective_date': self.effective_date,
             'payment_type': self.payment_type,
             'description': self.description,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at
+
         }
 
     @classmethod

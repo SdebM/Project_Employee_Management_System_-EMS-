@@ -71,6 +71,7 @@ class SalariesTab(BaseTab):
         super().__init__(salary_service, user)
         self.salary_service = salary_service
         self.employee_service = employee_service
+        self.logger = logging.getLogger(__name__)
         
         self.init_ui()
         self.setup_access_control()
@@ -140,7 +141,8 @@ class SalariesTab(BaseTab):
         
         self.date_from = QDateEdit()
         self.date_from.setCalendarPopup(True)
-        self.date_from.setDate(QDate.currentDate().addMonths(-1))
+        # По умолчанию показываем данные за последний год
+        self.date_from.setDate(QDate.currentDate().addYears(-1))
         
         self.date_to = QDateEdit()
         self.date_to.setCalendarPopup(True)
@@ -282,10 +284,15 @@ class SalariesTab(BaseTab):
             
             # Получаем данные через сервис
             salaries = self.salary_service.get_salaries(self.user, filters)
-            
+            try:
+                sample_ids = [s.salary_id for s in salaries[:5]]
+            except Exception:
+                sample_ids = None
+            self.logger.debug(f"Получено {len(salaries)} выплат, filters={filters}, sample_ids={sample_ids}")
+
             # Заполняем таблицу
             self._populate_table(salaries)
-            
+
             # Обновляем итоги
             self._update_totals(salaries)
             
@@ -306,9 +313,11 @@ class SalariesTab(BaseTab):
             self.main_table.setItem(row, 3, QTableWidgetItem(
                 PAYMENT_TYPE_MAP.get(sal.payment_type, sal.payment_type)
             ))
-            self.main_table.setItem(row, 4, QTableWidgetItem(sal.formatted_amount))
+            # Сумма и дата — используем поля модели Salary: salary_amount, effective_date
+            amount_text = getattr(sal, 'formatted_amount', None) or (f"{getattr(sal, 'salary_amount', 0):,.2f} ₽")
+            self.main_table.setItem(row, 4, QTableWidgetItem(amount_text))
             self.main_table.setItem(row, 5, QTableWidgetItem(
-                Formatters.format_date(sal.payment_date)
+                Formatters.format_date(getattr(sal, 'effective_date', None))
             ))
             self.main_table.setItem(row, 6, QTableWidgetItem(sal.description or ""))
             
@@ -320,7 +329,7 @@ class SalariesTab(BaseTab):
     
     def _update_totals(self, salaries: List[Salary]):
         """Обновляет итоговые показатели."""
-        total = sum(sal.amount for sal in salaries)
+        total = sum(getattr(sal, 'salary_amount', 0) for sal in salaries)
         self.total_label.setText(f"Итого: {total:,.2f} ₽")
         self.count_label.setText(f"Записей: {len(salaries)}")
 
