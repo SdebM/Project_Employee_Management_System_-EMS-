@@ -139,7 +139,9 @@ class Employee:
             'inn': self.inn,
             'snils': self.snils,
             'passport': self.passport,
-            'status': self.status
+            'status': self.status,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at
         }
     
     def to_safe_dict(self) -> dict:

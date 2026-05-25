@@ -138,7 +138,7 @@ class EmployeesTabNew(BaseTab):
         table = QTableWidget()
         
         columns = ["ID", "Имя", "Фамилия", "Дата рождения", 
-                   "Пол", "Дата приема", "Отдел", "Статус"]
+                   "Пол", "Дата приема", "Отдел", "Статус", "Дата создания", "Дата обновления"]
         table.setColumnCount(len(columns))
         table.setHorizontalHeaderLabels(columns)
         
@@ -147,7 +147,7 @@ class EmployeesTabNew(BaseTab):
         header.setStretchLastSection(True)
         
         # Установка начальной ширины колонок
-        column_widths = [50, 100, 120, 100, 50, 100, 180, 100]
+        column_widths = [50, 100, 120, 100, 50, 100, 180, 100, 140, 140]
         for i, width in enumerate(column_widths):
             table.setColumnWidth(i, width)
         
@@ -266,6 +266,12 @@ class EmployeesTabNew(BaseTab):
             self.main_table.setItem(row, 6, QTableWidgetItem(emp.department_name or ""))
             self.main_table.setItem(row, 7, QTableWidgetItem(
                 Formatters.format_status(emp.status)
+            ))
+            self.main_table.setItem(row, 8, QTableWidgetItem(
+                Formatters.format_datetime(emp.created_at)
+            ))
+            self.main_table.setItem(row, 9, QTableWidgetItem(
+                Formatters.format_datetime(emp.updated_at)
             ))
             
             # Центрирование
@@ -525,7 +531,9 @@ class EmployeesTabNew(BaseTab):
                     f"<b>Пол:</b> {employee.gender}<br>"
                     f"<b>Дата приема:</b> {Formatters.format_date(employee.hire_date)}<br>"
                     f"<b>Отдел:</b> {employee.department_name or ''}<br>"
-                    f"<b>Статус:</b> {Formatters.format_status(employee.status)}"
+                    f"<b>Статус:</b> {Formatters.format_status(employee.status)}<br>"
+                    f"<b>Дата создания:</b> {Formatters.format_datetime(employee.created_at)}<br>"
+                    f"<b>Дата обновления:</b> {Formatters.format_datetime(employee.updated_at)}"
                 )
                 QMessageBox.information(self, "Детали сотрудника", details)
         except Exception as e:
