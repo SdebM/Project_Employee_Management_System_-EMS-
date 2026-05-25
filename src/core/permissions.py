@@ -103,6 +103,7 @@ ROLE_PERMISSIONS: Dict[str, Set[str]] = {
     'employee': {
         # Только просмотр своих данных
         Permission.VIEW_EMPLOYEES,
+        Permission.VIEW_DEPARTMENTS,
     }
 }
 
