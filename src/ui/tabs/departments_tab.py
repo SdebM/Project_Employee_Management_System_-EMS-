@@ -59,6 +59,7 @@ class DepartmentsTab(BaseTab):
         super().__init__(department_service, user)
         self.department_service = department_service
         self.employee_service = employee_service
+        self.logger = logging.getLogger(__name__)
         
         self.init_ui()
         self.setup_access_control()
@@ -195,6 +196,7 @@ class DepartmentsTab(BaseTab):
     def load_data(self):
         """Загружает список отделов из сервиса."""
         try:
+            self.logger.debug(f"DepartmentsTab.load_data called by user={self.user}")
             # Собираем фильтры
             filters = {}
             
@@ -204,6 +206,12 @@ class DepartmentsTab(BaseTab):
             
             # Получаем данные через сервис
             departments = self.department_service.get_departments(self.user, filters)
+
+            try:
+                sample_ids = [d.department_id for d in departments[:5]]
+            except Exception:
+                sample_ids = None
+            self.logger.debug(f"Получено {len(departments)} отделов, filters={filters}, sample_ids={sample_ids}")
             
             # Заполняем таблицу
             self._populate_table(departments)
@@ -211,7 +219,7 @@ class DepartmentsTab(BaseTab):
         except PermissionDeniedError as e:
             self.show_error("Доступ запрещен", str(e))
         except Exception as e:
-            logging.error(f"Ошибка загрузки отделов: {e}")
+            self.logger.exception(f"Ошибка загрузки отделов: {e}")
             self.show_error("Ошибка", "Не удалось загрузить список отделов")
 
     def _populate_table(self, departments: List[Department]):
@@ -221,7 +229,7 @@ class DepartmentsTab(BaseTab):
         for row, dept in enumerate(departments):
             self.main_table.setItem(row, 0, QTableWidgetItem(str(dept.department_id)))
             self.main_table.setItem(row, 1, QTableWidgetItem(dept.department_name))
-            self.main_table.setItem(row, 2, QTableWidgetItem(dept.description or ""))
+            self.main_table.setItem(row, 2, QTableWidgetItem(getattr(dept, 'description', '') or ""))
             self.main_table.setItem(row, 3, QTableWidgetItem(dept.manager_name or "Не назначен"))
             self.main_table.setItem(row, 4, QTableWidgetItem(str(dept.employee_count)))
             
@@ -384,7 +392,7 @@ class DepartmentDialog(QDialog):
         """Загружает данные отдела в форму."""
         if self.department:
             self.name_edit.setText(self.department.department_name)
-            self.description_edit.setPlainText(self.department.description or "")
+            self.description_edit.setPlainText(getattr(self.department, 'description', '') or "")
             
             # Выбираем руководителя
             if self.department.manager_id:

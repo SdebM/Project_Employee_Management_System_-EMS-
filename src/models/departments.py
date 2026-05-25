@@ -59,6 +59,8 @@ class Department:
             'department_id': self.department_id,
             'department_name': self.department_name,
             'manager_id': self.manager_id,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at
         }
 
     @classmethod
