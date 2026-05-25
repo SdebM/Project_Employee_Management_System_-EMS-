@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QComboBox, QLabel, QMessageBox, QDialog,
     QFormLayout, QTextEdit, QDateEdit, QDoubleSpinBox
 )
+from PyQt6.QtWidgets import QCheckBox
 from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QIcon, QColor
 
@@ -144,11 +145,35 @@ class ProjectsTab(BaseTab):
         
         self.department_combo = QComboBox()
         self._load_departments()
+        # Фильтры по датам создания/обновления
+        self.created_from_chk = QCheckBox("Дата создания от")
+        self.created_from_date = QDateEdit()
+        self.created_from_date.setCalendarPopup(True)
+        self.created_to_chk = QCheckBox("до")
+        self.created_to_date = QDateEdit()
+        self.created_to_date.setCalendarPopup(True)
+
+        self.updated_from_chk = QCheckBox("Дата обновления от")
+        self.updated_from_date = QDateEdit()
+        self.updated_from_date.setCalendarPopup(True)
+        self.updated_to_chk = QCheckBox("до")
+        self.updated_to_date = QDateEdit()
+        self.updated_to_date.setCalendarPopup(True)
         
         panel.addWidget(QLabel("Фильтры:"))
         panel.addWidget(self.search_name)
         panel.addWidget(self.status_combo)
         panel.addWidget(self.department_combo)
+        # created
+        panel.addWidget(self.created_from_chk)
+        panel.addWidget(self.created_from_date)
+        panel.addWidget(self.created_to_chk)
+        panel.addWidget(self.created_to_date)
+        # updated
+        panel.addWidget(self.updated_from_chk)
+        panel.addWidget(self.updated_from_date)
+        panel.addWidget(self.updated_to_chk)
+        panel.addWidget(self.updated_to_date)
         panel.addStretch()
         
         return panel
@@ -158,18 +183,13 @@ class ProjectsTab(BaseTab):
         table = QTableWidget()
         
         columns = ["ID", "Название", "Статус", "Дата начала", 
-                   "Дата окончания", "Бюджет", "Отдел"]
+                   "Дата окончания", "Бюджет", "Отдел", "Дата создания", "Дата обновления"]
         table.setColumnCount(len(columns))
         table.setHorizontalHeaderLabels(columns)
-        
-        # Настройка заголовков
+
+        # Настройка заголовков — равномерное растяжение колонок
         header = table.horizontalHeader()
-        header.setStretchLastSection(True)
-        
-        # Установка начальной ширины колонок
-        column_widths = [50, 200, 120, 100, 100, 120, 180]
-        for i, width in enumerate(column_widths):
-            table.setColumnWidth(i, width)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         
         # Стили
         table.setStyleSheet(TABLE_STYLES.get("base", ""))
@@ -253,6 +273,24 @@ class ProjectsTab(BaseTab):
             dept_id = self.department_combo.currentData()
             if dept_id:
                 filters['department_id'] = dept_id
+
+            # даты создания/обновления (по чекбоксам)
+            from datetime import timedelta
+            if getattr(self, 'created_from_chk', None) and self.created_from_chk.isChecked():
+                d = self.created_from_date.date()
+                filters['created_from'] = date(d.year(), d.month(), d.day())
+            if getattr(self, 'created_to_chk', None) and self.created_to_chk.isChecked():
+                d = self.created_to_date.date()
+                # включительно: добавим 1 день
+                from datetime import timedelta
+                filters['created_to'] = date(d.year(), d.month(), d.day()) + timedelta(days=1)
+            if getattr(self, 'updated_from_chk', None) and self.updated_from_chk.isChecked():
+                d = self.updated_from_date.date()
+                filters['updated_from'] = date(d.year(), d.month(), d.day())
+            if getattr(self, 'updated_to_chk', None) and self.updated_to_chk.isChecked():
+                d = self.updated_to_date.date()
+                from datetime import timedelta
+                filters['updated_to'] = date(d.year(), d.month(), d.day()) + timedelta(days=1)
             
             # Получаем данные через сервис
             projects = self.project_service.get_projects(self.user, filters)
@@ -291,6 +329,13 @@ class ProjectsTab(BaseTab):
                 Formatters.format_money(proj.budget) if proj.budget else ""
             ))
             self.main_table.setItem(row, 6, QTableWidgetItem(proj.department_name or ""))
+            # Дата создания и обновления
+            self.main_table.setItem(row, 7, QTableWidgetItem(
+                Formatters.format_datetime(proj.created_at)
+            ))
+            self.main_table.setItem(row, 8, QTableWidgetItem(
+                Formatters.format_datetime(proj.updated_at)
+            ))
             
             # Центрирование
             for col in range(self.main_table.columnCount()):
@@ -435,6 +480,11 @@ class ProjectDialog(QDialog):
         layout.addRow("Дата окончания:", self.end_date_edit)
         layout.addRow("Бюджет:", self.budget_spin)
         layout.addRow("Отдел:", self.department_combo)
+        # Показать read-only даты создания/обновления (только при редактировании)
+        self.created_label = QLabel("")
+        self.updated_label = QLabel("")
+        layout.addRow("Дата создания:", self.created_label)
+        layout.addRow("Дата обновления:", self.updated_label)
         
         # Кнопки
         button_layout = QHBoxLayout()
@@ -501,6 +551,11 @@ class ProjectDialog(QDialog):
                 index = self.department_combo.findData(self.project.department_id)
                 if index >= 0:
                     self.department_combo.setCurrentIndex(index)
+            # Даты создания/обновления (если есть)
+            if getattr(self.project, 'created_at', None):
+                self.created_label.setText(Formatters.format_datetime(self.project.created_at))
+            if getattr(self.project, 'updated_at', None):
+                self.updated_label.setText(Formatters.format_datetime(self.project.updated_at))
     
     def get_data(self) -> dict:
         """Возвращает данные из формы."""

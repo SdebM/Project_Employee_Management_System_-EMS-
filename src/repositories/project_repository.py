@@ -4,6 +4,7 @@ from typing import List, Optional, Dict, Any
 from .base_repository import BaseRepository
 from models.projects import Project
 from core.database import Database
+import logging
 
 
 class ProjectRepository(BaseRepository[Project]):
@@ -63,13 +64,30 @@ class ProjectRepository(BaseRepository[Project]):
             if filters.get('department_id'):
                 query += " AND p.department_id = %s"
                 params.append(filters['department_id'])
+            # Фильтры по created_at / updated_at
+            if filters.get('created_from'):
+                query += " AND p.created_at >= %s"
+                params.append(filters['created_from'])
+            if filters.get('created_to'):
+                query += " AND p.created_at <= %s"
+                params.append(filters['created_to'])
+            if filters.get('updated_from'):
+                query += " AND p.updated_at >= %s"
+                params.append(filters['updated_from'])
+            if filters.get('updated_to'):
+                query += " AND p.updated_at <= %s"
+                params.append(filters['updated_to'])
 
         query += " ORDER BY p.start_date DESC"
 
         rows = self._db.fetch_all(query, tuple(params))
         projects = []
         for row in rows:
-            proj = Project.from_db_row(row[:10])
+            try:
+                proj = Project.from_db_row(row[:10])
+            except Exception as e:
+                logging.error(f"Проект пропущен (id={row[0] if row and len(row)>0 else 'n/a'}): {e}")
+                continue
             proj.department_name = row[10] if len(row) > 10 else None
             projects.append(proj)
         return projects
@@ -89,7 +107,11 @@ class ProjectRepository(BaseRepository[Project]):
         """
         row = self._db.fetch_one(query, (project_id,))
         if row:
-            proj = Project.from_db_row(row[:10])
+            try:
+                proj = Project.from_db_row(row[:10])
+            except Exception as e:
+                logging.error(f"Ошибка при разборе проекта (id={project_id}): {e}")
+                return None
             proj.department_name = row[10] if len(row) > 10 else None
             return proj
         return None

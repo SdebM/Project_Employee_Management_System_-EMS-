@@ -119,6 +119,9 @@ class Project:
             'status': self.status,
             'budget': float(self.budget) if self.budget is not None else None,
             'department_id': self.department_id,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at
+
         }
 
     @classmethod
