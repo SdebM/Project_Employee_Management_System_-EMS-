@@ -108,6 +108,9 @@ class User:
             'role': self.role,
             'department_id': self.department_id,
             'is_active': self.is_active,
+            'created_at': self.created_at,
+            'last_login': self.last_login
+
         }
 
     def to_session_dict(self) -> dict:
@@ -116,6 +119,10 @@ class User:
             'id': self.id,
             'role': self.role,
             'department_id': self.department_id,
+                'is_active': self.is_active,
+                'created_at': self.created_at,
+                'last_login': self.last_login
+
         }
 
     @classmethod

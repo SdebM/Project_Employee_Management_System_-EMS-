@@ -65,7 +65,7 @@ class AnalyticsService:
                 DATE_TRUNC('month', effective_date) as month,
                 SUM(salary_amount) as total
             FROM salaries
-            WHERE effective_date >= NOW() - INTERVAL '1 month' * %s
+            WHERE effective_date >= NOW() - (%s::text || ' months')::INTERVAL
             GROUP BY month
             ORDER BY month
         """
@@ -170,7 +170,7 @@ class AnalyticsService:
                 DATE_TRUNC('month', hire_date) as month,
                 COUNT(*) as hired
             FROM employees
-            WHERE hire_date >= NOW() - INTERVAL '1 month' * %s
+            WHERE hire_date >= NOW() - (%s::text || ' months')::INTERVAL
             GROUP BY month
             ORDER BY month
         """

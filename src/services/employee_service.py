@@ -73,6 +73,10 @@ class EmployeeService:
         
         filters = filters or {}
         
+        # По умолчанию показываем только активных сотрудников
+        if 'status' not in filters:
+            filters['status'] = 'active'
+        
         # Менеджеры видят только свой отдел
         if user.get('role') == 'manager' and user.get('department_id'):
             filters['department_id'] = user['department_id']

@@ -265,6 +265,9 @@ class SalariesTab(BaseTab):
     def load_data(self):
         """Загружает список зарплатных записей из сервиса."""
         try:
+            # Обновляем список сотрудников при каждой загрузке
+            self._load_employees()
+            
             # Собираем фильтры
             filters = {}
             
@@ -501,7 +504,7 @@ class SalaryDialog(QDialog):
                 self.employee_combo.setCurrentIndex(index)
             
             # Сумма
-            self.amount_spin.setValue(float(self.salary.amount))
+            self.amount_spin.setValue(float(self.salary.salary_amount))
             
             # Тип выплаты
             index = self.type_combo.findData(self.salary.payment_type)
@@ -509,11 +512,11 @@ class SalaryDialog(QDialog):
                 self.type_combo.setCurrentIndex(index)
             
             # Дата
-            if self.salary.payment_date:
+            if self.salary.effective_date:
                 self.date_edit.setDate(QDate(
-                    self.salary.payment_date.year,
-                    self.salary.payment_date.month,
-                    self.salary.payment_date.day
+                    self.salary.effective_date.year,
+                    self.salary.effective_date.month,
+                    self.salary.effective_date.day
                 ))
             
             # Описание
@@ -521,12 +524,12 @@ class SalaryDialog(QDialog):
     
     def get_data(self) -> dict:
         """Возвращает данные из формы."""
-        payment_date = self.date_edit.date()
+        effective_date = self.date_edit.date()
         
         return {
             'employee_id': self.employee_combo.currentData(),
-            'amount': self.amount_spin.value(),
+            'salary_amount': self.amount_spin.value(),
             'payment_type': self.type_combo.currentData(),
-            'payment_date': date(payment_date.year(), payment_date.month(), payment_date.day()),
+            'effective_date': date(effective_date.year(), effective_date.month(), effective_date.day()),
             'description': self.description_edit.toPlainText().strip() or None
         }

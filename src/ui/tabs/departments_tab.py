@@ -229,7 +229,7 @@ class DepartmentsTab(BaseTab):
         for row, dept in enumerate(departments):
             self.main_table.setItem(row, 0, QTableWidgetItem(str(dept.department_id)))
             self.main_table.setItem(row, 1, QTableWidgetItem(dept.department_name))
-            self.main_table.setItem(row, 2, QTableWidgetItem(getattr(dept, 'description', '') or ""))
+            self.main_table.setItem(row, 2, QTableWidgetItem(dept.description or ""))
             self.main_table.setItem(row, 3, QTableWidgetItem(dept.manager_name or "Не назначен"))
             self.main_table.setItem(row, 4, QTableWidgetItem(str(dept.employee_count)))
             
@@ -392,10 +392,10 @@ class DepartmentDialog(QDialog):
         """Загружает данные отдела в форму."""
         if self.department:
             self.name_edit.setText(self.department.department_name)
-            self.description_edit.setPlainText(getattr(self.department, 'description', '') or "")
+            self.description_edit.setPlainText(self.department.description or "")
             
             # Выбираем руководителя
-            if self.department.manager_id:
+            if hasattr(self.department, 'manager_id') and self.department.manager_id:
                 index = self.manager_combo.findData(self.department.manager_id)
                 if index >= 0:
                     self.manager_combo.setCurrentIndex(index)

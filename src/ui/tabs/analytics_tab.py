@@ -7,30 +7,24 @@
 - Сводная статистика
 """
 
-from typing import List, Dict, Any
+import os
 import logging
 
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QComboBox, QLabel, QGroupBox, QGridLayout,
-    QScrollArea, QFrame, QSpinBox
+    QScrollArea, QFrame, QSpinBox, QMessageBox, QFileDialog
 )
 from PyQt6.QtCore import Qt
-
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
 
 from ui.base_tab import BaseTab
 from services.analytics_service import AnalyticsService
 from core.permissions import Permission
 from core.exceptions import PermissionDeniedError
 from styles import BUTTON_STYLES
-
-
-# Настройка matplotlib для русского языка
-plt.rcParams['font.family'] = 'DejaVu Sans'
-plt.rcParams['axes.unicode_minus'] = False
 
 
 class AnalyticsTab(BaseTab):
@@ -44,8 +38,24 @@ class AnalyticsTab(BaseTab):
     """
     
     BUTTON_PERMISSIONS = {
-        'btn_export_excel': Permission.EXPORT_DATA,
-        'btn_export_pdf': Permission.EXPORT_DATA,
+        'btn_export_chart': Permission.EXPORT_DATA,
+    }
+
+    CUSTOM_STYLE = {
+        'axes.facecolor': '#f8f9fa',
+        'axes.edgecolor': '#2c3e50',
+        'axes.labelcolor': '#2c3e50',
+        'xtick.color': '#34495e',
+        'ytick.color': '#34495e',
+        'axes.titlecolor': '#2c3e50',
+        'axes.titlesize': 14,
+        'axes.labelsize': 12,
+        'xtick.labelsize': 10,
+        'ytick.labelsize': 10,
+        'font.family': 'DejaVu Sans',
+        'grid.color': '#d6dbdf',
+        'grid.alpha': 0.5,
+        'figure.facecolor': '#ffffff'
     }
 
     def __init__(
@@ -60,6 +70,7 @@ class AnalyticsTab(BaseTab):
         """
         super().__init__(analytics_service, user)
         self.analytics_service = analytics_service
+        self.data_loaded = False
         
         self.init_ui()
         self.setup_access_control()
@@ -112,10 +123,6 @@ class AnalyticsTab(BaseTab):
         
         main_layout.addWidget(scroll)
         
-        # Нижняя панель
-        bottom_panel = self._create_bottom_panel()
-        main_layout.addLayout(bottom_panel)
-        
         self.setLayout(main_layout)
         
         # Подключение сигналов
@@ -127,6 +134,9 @@ class AnalyticsTab(BaseTab):
         
         self.btn_refresh = QPushButton("Обновить")
         self.btn_refresh.setStyleSheet(BUTTON_STYLES.get("primary", ""))
+
+        self.btn_export_chart = QPushButton("Экспорт")
+        self.btn_export_chart.setStyleSheet(BUTTON_STYLES.get("export", ""))
         
         panel.addWidget(QLabel("Период динамики (месяцев):"))
         
@@ -135,24 +145,9 @@ class AnalyticsTab(BaseTab):
         self.months_spin.setValue(12)
         panel.addWidget(self.months_spin)
         
+        panel.addWidget(self.btn_export_chart)
         panel.addWidget(self.btn_refresh)
         panel.addStretch()
-        
-        return panel
-
-    def _create_bottom_panel(self) -> QHBoxLayout:
-        """Создает нижнюю панель."""
-        panel = QHBoxLayout()
-        
-        self.btn_export_excel = QPushButton("Экспорт в Excel")
-        self.btn_export_pdf = QPushButton("Экспорт в PDF")
-        
-        self.btn_export_excel.setStyleSheet(BUTTON_STYLES.get("export", ""))
-        self.btn_export_pdf.setStyleSheet(BUTTON_STYLES.get("pdf", ""))
-        
-        panel.addStretch()
-        panel.addWidget(self.btn_export_excel)
-        panel.addWidget(self.btn_export_pdf)
         
         return panel
 
@@ -195,28 +190,73 @@ class AnalyticsTab(BaseTab):
 
     def _connect_signals(self):
         """Подключает сигналы к слотам."""
-        self.btn_refresh.clicked.connect(self.load_data)
-        self.btn_export_excel.clicked.connect(self.export_to_excel)
-        self.btn_export_pdf.clicked.connect(self.export_to_pdf)
-        self.months_spin.valueChanged.connect(self._update_hiring_chart)
+        self.btn_refresh.clicked.connect(self.safe_refresh_data)
+        self.btn_export_chart.clicked.connect(self.safe_export_chart)
+        self.months_spin.valueChanged.connect(self.plot_hiring)
+
+    def apply_custom_style(self):
+        """Применяет кастомный стиль matplotlib."""
+        plt.rcParams.update(self.CUSTOM_STYLE)
+        plt.rcParams['axes.unicode_minus'] = False
 
     def load_data(self):
         """Загружает данные и обновляет графики."""
         try:
-            self._update_employees_chart()
-            self._update_salary_chart()
-            self._update_projects_chart()
-            self._update_hiring_chart()
+            self.apply_custom_style()
+            self.plot_employees()
+            self.plot_salary()
+            self.plot_projects()
+            self.plot_hiring()
+            self.data_loaded = True
         except PermissionDeniedError as e:
             self.show_error("Доступ запрещен", str(e))
         except Exception as e:
             logging.error(f"Ошибка загрузки аналитики: {e}")
             self.show_error("Ошибка", "Не удалось загрузить данные аналитики")
 
-    def _update_employees_chart(self):
-        """Обновляет диаграмму сотрудников по отделам."""
+    def safe_refresh_data(self):
+        """Обновляет данные и перерисовывает графики."""
         try:
-            data = self.analytics_service.get_employees_by_department(self.user)
+            self.load_data()
+            QMessageBox.information(self, "Обновлено", "Данные успешно обновлены")
+        except Exception as e:
+            logging.error(f"Ошибка обновления аналитики: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Ошибка обновления данных:\n{str(e)}")
+
+    def safe_export_chart(self):
+        """Экспортирует активный график в файл."""
+        try:
+            if not hasattr(self, 'fig_employees'):
+                QMessageBox.warning(self, "Ошибка", "Нет графика для экспорта")
+                return
+
+            file_path, selected_filter = QFileDialog.getSaveFileName(
+                self,
+                "Экспорт графика",
+                os.path.expanduser("~/analytics_chart"),
+                "PNG (*.png);;PDF (*.pdf);;SVG (*.svg);;JPEG (*.jpg *.jpeg)"
+            )
+            if not file_path:
+                return
+
+            ext = selected_filter.split(' ')[0].lower()
+            figure = self.fig_employees
+            figure.savefig(
+                file_path,
+                dpi=300,
+                bbox_inches='tight',
+                facecolor=figure.get_facecolor(),
+                format='jpeg' if ext == 'jpeg' else ext
+            )
+            QMessageBox.information(self, "Успех", f"График экспортирован:\n{file_path}")
+        except Exception as e:
+            logging.error(f"Ошибка экспорта: {str(e)}")
+            QMessageBox.critical(self, "Ошибка", f"Ошибка экспорта:\n{str(e)}")
+
+    def plot_employees(self):
+        """Строит диаграмму сотрудников по отделам."""
+        try:
+            data = self.analytics_service.get_employee_department(self.user)
             
             self.ax_employees.clear()
             
@@ -224,7 +264,6 @@ class AnalyticsTab(BaseTab):
                 labels = [d['department_name'] for d in data]
                 sizes = [d['count'] for d in data]
                 
-                # Цвета
                 colors = plt.cm.Set3(range(len(data)))
                 
                 wedges, texts, autotexts = self.ax_employees.pie(
@@ -235,7 +274,6 @@ class AnalyticsTab(BaseTab):
                     startangle=90
                 )
                 
-                # Легенда для большого количества отделов
                 if len(labels) > 6:
                     self.ax_employees.legend(
                         wedges, labels,
@@ -254,10 +292,10 @@ class AnalyticsTab(BaseTab):
             self.fig_employees.canvas.draw()
             
         except Exception as e:
-            logging.error(f"Ошибка обновления диаграммы сотрудников: {e}")
+            logging.error(f"Ошибка построения диаграммы сотрудников: {e}")
 
-    def _update_salary_chart(self):
-        """Обновляет диаграмму средней зарплаты."""
+    def plot_salary(self):
+        """Строит диаграмму средней зарплаты по отделам."""
         try:
             data = self.analytics_service.get_average_salary_by_department(self.user)
             
@@ -271,7 +309,6 @@ class AnalyticsTab(BaseTab):
                 self.ax_salary.set_xlabel('Средняя зарплата, ₽')
                 self.ax_salary.set_title('Средняя зарплата по отделам')
                 
-                # Добавление значений на столбцы
                 for bar, salary in zip(bars, salaries):
                     width = bar.get_width()
                     self.ax_salary.text(
@@ -287,10 +324,10 @@ class AnalyticsTab(BaseTab):
             self.fig_salary.canvas.draw()
             
         except Exception as e:
-            logging.error(f"Ошибка обновления диаграммы зарплат: {e}")
+            logging.error(f"Ошибка построения диаграммы зарплат: {e}")
 
-    def _update_projects_chart(self):
-        """Обновляет диаграмму статусов проектов."""
+    def plot_projects(self):
+        """Строит диаграмму статусов проектов."""
         try:
             data = self.analytics_service.get_projects_by_status(self.user)
             
@@ -300,7 +337,6 @@ class AnalyticsTab(BaseTab):
                 labels = [d['status'] for d in data]
                 sizes = [d['count'] for d in data]
                 
-                # Цвета по статусам
                 status_colors = {
                     'Планирование': '#17a2b8',
                     'В работе': '#28a745',
@@ -327,10 +363,10 @@ class AnalyticsTab(BaseTab):
             self.fig_projects.canvas.draw()
             
         except Exception as e:
-            logging.error(f"Ошибка обновления диаграммы проектов: {e}")
+            logging.error(f"Ошибка построения диаграммы проектов: {e}")
 
-    def _update_hiring_chart(self):
-        """Обновляет график динамики найма."""
+    def plot_hiring(self):
+        """Строит график динамики найма."""
         try:
             months = self.months_spin.value()
             data = self.analytics_service.get_hiring_dynamics(self.user, months)
@@ -354,7 +390,6 @@ class AnalyticsTab(BaseTab):
                 self.ax_hiring.set_ylabel('Принято сотрудников')
                 self.ax_hiring.set_title('Динамика найма')
                 
-                # Поворот подписей оси X
                 plt.setp(self.ax_hiring.xaxis.get_majorticklabels(), rotation=45)
                 
                 self.ax_hiring.grid(True, alpha=0.3)
@@ -366,7 +401,7 @@ class AnalyticsTab(BaseTab):
             self.fig_hiring.canvas.draw()
             
         except Exception as e:
-            logging.error(f"Ошибка обновления графика найма: {e}")
+            logging.error(f"Ошибка построения графика найма: {e}")
 
     def _get_export_filename(self, extension: str) -> str:
         return f"analytics_report.{extension}"

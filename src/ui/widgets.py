@@ -68,10 +68,9 @@ class DataTableWidget(QTableWidget):
         self.setColumnCount(len(self.columns))
         self.setHorizontalHeaderLabels(self.columns)
         
-        # Растягивание последней колонки
+        # Равномерное растягивание всех колонок
         header = self.horizontalHeader()
-        header.setStretchLastSection(True)
-        header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         
         # Стили
         self.setStyleSheet(TABLE_STYLES.get("base", ""))

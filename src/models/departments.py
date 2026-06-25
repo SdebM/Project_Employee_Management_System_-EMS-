@@ -37,6 +37,7 @@ class Department:
     # --- поля таблицы ---
     department_id: Optional[int] = None
     department_name: str = ""
+    description: Optional[str] = None
     manager_id: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

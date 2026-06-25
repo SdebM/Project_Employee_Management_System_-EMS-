@@ -8,6 +8,7 @@
 CREATE TABLE IF NOT EXISTS departments (
     department_id SERIAL PRIMARY KEY,
     department_name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,                            -- Описание отдела
     manager_id INTEGER,                          -- FK добавляется после создания employees
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()

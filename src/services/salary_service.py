@@ -72,8 +72,8 @@ class SalaryService:
         
         self._validate_salary_data(data, is_update=True)
         
-        if 'amount' in data:
-            data['amount'] = Decimal(str(data['amount']))
+        if 'salary_amount' in data:
+            data['salary_amount'] = Decimal(str(data['salary_amount']))
         
         for field, value in data.items():
             if hasattr(salary, field):

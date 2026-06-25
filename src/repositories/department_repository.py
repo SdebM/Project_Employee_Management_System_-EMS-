@@ -20,6 +20,7 @@ class DepartmentRepository(BaseRepository[Department]):
         """Преобразует Department в параметры SQL."""
         return (
             entity.department_name,
+            entity.description,
             entity.manager_id
         )
 
@@ -86,8 +87,8 @@ class DepartmentRepository(BaseRepository[Department]):
             ID созданного отдела
         """
         query = """
-            INSERT INTO departments (department_name, manager_id)
-            VALUES (%s, %s)
+            INSERT INTO departments (department_name, description, manager_id)
+            VALUES (%s, %s, %s)
             RETURNING department_id
         """
         params = self._entity_to_params(department)
@@ -98,7 +99,7 @@ class DepartmentRepository(BaseRepository[Department]):
         """Обновляет данные отдела."""
         query = """
             UPDATE departments SET
-                department_name = %s, 
+                department_name = %s, description = %s,
                 manager_id = %s, updated_at = NOW()
             WHERE department_id = %s
         """

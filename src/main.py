@@ -231,7 +231,14 @@ class MainWindow(QMainWindow):
                 logging.error(f"Ошибка создания вкладки аналитики: {e}", exc_info=True)
                 self.tabs.addTab(QLabel(f"Ошибка: {e}"), "Аналитика")
             
-            self.tabs.addTab(QLabel("В разработке"), "Пользователи")
+            # Вкладка пользователей
+            users_placeholder = QLabel(
+                "\n\nВкладка 'Пользователи' находится в разработке.\n"
+                "Управление пользователями будет добавлено позже."
+            )
+            users_placeholder.setStyleSheet("font-size: 12px; color: #666; padding: 20px;")
+            users_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.tabs.addTab(users_placeholder, "Пользователи")
     
     def closeEvent(self, event):
         """Обработка закрытия окна."""

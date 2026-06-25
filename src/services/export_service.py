@@ -5,7 +5,13 @@ from typing import List, Any
 from PyQt6.QtWidgets import QWidget, QTableWidget, QFileDialog, QMessageBox
 
 from reportlab.lib.pagesizes import A4, landscape
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Table,
+    TableStyle,
+    Paragraph,
+    Spacer,
+)
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfbase import pdfmetrics
@@ -17,57 +23,20 @@ import pandas as pd
 from core.permissions import Permission, check_permission
 
 
-class ExportService:
-    """Сервис для экспорта данных в различные форматы.
-    
-    Поддерживает:
-    - Экспорт в PDF
-    - Экспорт в Excel
-    - Настройка стилей и форматирования
-    """
+class PDFExporter:
+    """Класс для экспорта данных таблицы в PDF-формат."""
 
     @staticmethod
-    def check_export_permission(user: dict) -> bool:
-        """Проверяет право на экспорт данных."""
-        try:
-            check_permission(user, Permission.EXPORT_DATA)
-            return True
-        except Exception:
-            return False
-
-    @staticmethod
-    def export_to_pdf(
-        parent: QWidget,
-        table_widget: QTableWidget,
-        default_filename: str,
-        document_title: str
-    ) -> bool:
-        """Экспортирует таблицу в PDF.
-        
-        Args:
-            parent: Родительское окно для диалогов
-            table_widget: Таблица с данными
-            default_filename: Имя файла по умолчанию
-            document_title: Заголовок документа
-            
-        Returns:
-            True если экспорт успешен
-        """
+    def export_to_pdf(parent, table_widget, default_filename, document_title) -> bool:
         try:
             if table_widget.rowCount() == 0:
                 QMessageBox.warning(parent, "Ошибка", "Нет данных для экспорта")
                 return False
 
-            # Регистрация шрифтов
-            font_name = ExportService._register_fonts()
+            font_name = PDFExporter.register_fonts()
+            styles = PDFExporter.create_styles(font_name)
+            headers, table_data = PDFExporter.prepare_data(table_widget, styles)
 
-            # Создание стилей
-            styles = ExportService._create_styles(font_name)
-
-            # Подготовка данных
-            headers, table_data = ExportService._prepare_table_data(table_widget, styles)
-
-            # Диалог сохранения
             file_path, _ = QFileDialog.getSaveFileName(
                 parent,
                 "Экспорт в PDF",
@@ -77,7 +46,6 @@ class ExportService:
             if not file_path:
                 return False
 
-            # Создание документа
             doc = SimpleDocTemplate(
                 file_path,
                 pagesize=landscape(A4),
@@ -88,28 +56,29 @@ class ExportService:
             )
 
             elements = []
-            elements.append(Paragraph(document_title, styles['CustomTitle']))
-            elements.append(Spacer(1, 5 * mm))
+            elements.append(Paragraph(document_title, styles['Title']))
+            elements.append(Spacer(1, 0.2 * 25.4))
 
-            # Создание таблицы
-            pdf_table = Table(
+            table = Table(
                 table_data,
-                colWidths=ExportService._calculate_column_widths(len(headers))
+                colWidths=PDFExporter.calculate_column_widths(len(headers))
             )
-            pdf_table.setStyle(ExportService._create_table_style(font_name))
+            table.setStyle(PDFExporter.create_table_style(font_name))
 
-            elements.append(pdf_table)
+            elements.append(table)
             doc.build(elements)
 
             QMessageBox.information(
                 parent,
                 "Успех",
-                f"PDF-документ сохранен:\n{file_path}"
+                f"PDF-документ успешно сохранен:\n{file_path}"
             )
             return True
 
         except PermissionError:
-            QMessageBox.critical(parent, "Ошибка", "Нет прав для записи в выбранную директорию")
+            error_msg = "Нет прав для записи в выбранную директорию"
+            logging.error(error_msg)
+            QMessageBox.critical(parent, "Ошибка", error_msg)
             return False
         except Exception as e:
             logging.error(f"PDF Export Error: {str(e)}")
@@ -117,33 +86,116 @@ class ExportService:
             return False
 
     @staticmethod
-    def export_to_excel(
-        parent: QWidget,
-        table_widget: QTableWidget,
-        default_filename: str,
-        sheet_name: str = "Данные"
-    ) -> bool:
-        """Экспортирует таблицу в Excel.
-        
-        Args:
-            parent: Родительское окно
-            table_widget: Таблица с данными
-            default_filename: Имя файла по умолчанию
-            sheet_name: Название листа
-            
-        Returns:
-            True если экспорт успешен
-        """
+    def prepare_data(table_widget, styles):
+        def format_text(text, is_header=False):
+            style = styles['Header'] if is_header else styles['Body']
+            text = str(text).strip() if text else ""
+            return Paragraph(f"<b>{text}</b>" if is_header else text, style)
+
+        headers = [
+            table_widget.horizontalHeaderItem(i).text()
+            for i in range(table_widget.columnCount())
+        ]
+
+        table_data = []
+        if headers:
+            table_data.append([format_text(h, True) for h in headers])
+
+        for row in range(table_widget.rowCount()):
+            formatted_row = []
+            for col in range(table_widget.columnCount()):
+                item = table_widget.item(row, col)
+                text = item.text() if item else ""
+                formatted_row.append(format_text(text))
+            table_data.append(formatted_row)
+
+        return headers, table_data
+
+    @staticmethod
+    def create_styles(font_name):
+        styles = getSampleStyleSheet()
+
+        styles.add(ParagraphStyle(
+            name='Header',
+            parent=styles['Normal'],
+            fontName=font_name,
+            fontSize=9,
+            leading=11,
+            alignment=1,
+            textColor=colors.white,
+            spaceBefore=2,
+            spaceAfter=2
+        ))
+
+        styles.add(ParagraphStyle(
+            name='Body',
+            parent=styles['Normal'],
+            fontName=font_name,
+            fontSize=8,
+            leading=10,
+            alignment=1,
+            textColor=colors.black,
+            spaceBefore=2,
+            spaceAfter=2
+        ))
+
+        styles['Title'].fontName = font_name
+        styles['Title'].fontSize = 14
+        styles['Title'].alignment = 1
+
+        return styles
+
+    @staticmethod
+    def create_table_style(font_name):
+        return TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, -1), font_name),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f8f9fa')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#bdc3c7')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 3),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+        ])
+
+    @staticmethod
+    def register_fonts():
+        font_name = 'Helvetica'
+        try:
+            pdfmetrics.registerFont(TTFont('DejaVuSans', 'DejaVuSans.ttf'))
+            font_name = 'DejaVuSans'
+        except Exception:
+            try:
+                pdfmetrics.registerFont(TTFont('Arial', 'Arial.ttf'))
+                font_name = 'Arial'
+            except Exception:
+                logging.warning("Используется стандартный шрифт")
+        return font_name
+
+    @staticmethod
+    def calculate_column_widths(columns_count):
+        page_width = landscape(A4)[0] - 20 * mm
+        return [page_width / columns_count * 0.95] * columns_count
+
+
+class ExcelExporter:
+    """Класс для экспорта данных таблицы в Excel-формат."""
+
+    @staticmethod
+    def export_to_excel(parent, table_widget, default_filename, sheet_name="Данные") -> bool:
         try:
             if table_widget.rowCount() == 0:
                 QMessageBox.warning(parent, "Ошибка", "Нет данных для экспорта")
                 return False
 
-            # Сбор данных из таблицы
-            headers = []
-            for col in range(table_widget.columnCount()):
-                header = table_widget.horizontalHeaderItem(col)
-                headers.append(header.text() if header else f"Column {col}")
+            headers = [
+                table_widget.horizontalHeaderItem(i).text()
+                for i in range(table_widget.columnCount())
+            ]
 
             data = []
             for row in range(table_widget.rowCount()):
@@ -153,10 +205,8 @@ class ExportService:
                     row_data.append(item.text() if item else "")
                 data.append(row_data)
 
-            # Создание DataFrame
             df = pd.DataFrame(data, columns=headers)
 
-            # Диалог сохранения
             file_path, _ = QFileDialog.getSaveFileName(
                 parent,
                 "Экспорт в Excel",
@@ -166,101 +216,44 @@ class ExportService:
             if not file_path:
                 return False
 
-            # Сохранение в Excel
-            df.to_excel(file_path, sheet_name=sheet_name, index=False)
+            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
 
             QMessageBox.information(
                 parent,
                 "Успех",
-                f"Excel-файл сохранен:\n{file_path}"
+                f"Данные успешно экспортированы в файл:\n{file_path}"
             )
             return True
 
         except PermissionError:
-            QMessageBox.critical(parent, "Ошибка", "Нет прав для записи в выбранную директорию")
+            error_msg = "Нет прав для записи в выбранную директорию"
+            logging.error(error_msg)
+            QMessageBox.critical(parent, "Ошибка", error_msg)
             return False
         except Exception as e:
             logging.error(f"Excel Export Error: {str(e)}")
-            QMessageBox.critical(parent, "Ошибка", f"Не удалось создать Excel:\n{str(e)}")
+            QMessageBox.critical(
+                parent,
+                "Ошибка",
+                f"Не удалось экспортировать данные:\n{str(e)}"
+            )
+            return False
+
+
+class ExportService:
+    @staticmethod
+    def check_export_permission(user: dict) -> bool:
+        try:
+            check_permission(user, Permission.EXPORT_DATA)
+            return True
+        except Exception:
             return False
 
     @staticmethod
-    def _register_fonts() -> str:
-        """Регистрирует шрифты для PDF."""
-        try:
-            pdfmetrics.registerFont(TTFont('DejaVuSans', 'DejaVuSans.ttf'))
-            return 'DejaVuSans'
-        except Exception:
-            return 'Helvetica'
+    def export_to_pdf(parent: QWidget, table_widget: QTableWidget, default_filename: str, document_title: str) -> bool:
+        return PDFExporter.export_to_pdf(parent, table_widget, default_filename, document_title)
 
     @staticmethod
-    def _create_styles(font_name: str) -> dict:
-        """Создает стили для PDF документа."""
-        styles = getSampleStyleSheet()
-        
-        styles.add(ParagraphStyle(
-            name='CustomTitle',
-            fontName=font_name,
-            fontSize=16,
-            alignment=1,
-            spaceAfter=12
-        ))
-        
-        styles.add(ParagraphStyle(
-            name='CustomHeader',
-            fontName=font_name,
-            fontSize=10,
-            alignment=1
-        ))
-        
-        styles.add(ParagraphStyle(
-            name='CustomBody',
-            fontName=font_name,
-            fontSize=9,
-            alignment=1
-        ))
-        
-        return styles
-
-    @staticmethod
-    def _prepare_table_data(table_widget: QTableWidget, styles: dict) -> tuple:
-        """Подготавливает данные таблицы для PDF."""
-        headers = []
-        for col in range(table_widget.columnCount()):
-            header = table_widget.horizontalHeaderItem(col)
-            text = header.text() if header else ""
-            headers.append(Paragraph(f"<b>{text}</b>", styles['CustomHeader']))
-
-        table_data = [headers]
-        
-        for row in range(table_widget.rowCount()):
-            row_data = []
-            for col in range(table_widget.columnCount()):
-                item = table_widget.item(row, col)
-                text = item.text() if item else ""
-                row_data.append(Paragraph(text, styles['CustomBody']))
-            table_data.append(row_data)
-
-        return headers, table_data
-
-    @staticmethod
-    def _calculate_column_widths(num_columns: int) -> List[float]:
-        """Рассчитывает ширину колонок."""
-        page_width = landscape(A4)[0] - 20 * mm
-        return [page_width / num_columns] * num_columns
-
-    @staticmethod
-    def _create_table_style(font_name: str) -> TableStyle:
-        """Создает стиль таблицы для PDF."""
-        return TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, -1), font_name),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('FONTSIZE', (0, 1), (-1, -1), 9),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#bdc3c7')),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')])
-        ])
+    def export_to_excel(parent: QWidget, table_widget: QTableWidget, default_filename: str, sheet_name: str = "Данные") -> bool:
+        return ExcelExporter.export_to_excel(parent, table_widget, default_filename, sheet_name)
