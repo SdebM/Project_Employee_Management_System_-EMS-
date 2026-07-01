@@ -170,15 +170,12 @@ class AuthService:
             True если изменение успешно
         """
         # Получаем пользователя по ID с паролем
-        row = self._db.fetch_one(
-            "SELECT id, username, password_hash, role, department_id, is_active "
-            "FROM users WHERE id = %s", (user_id,)
-        )
-        if not row:
-            raise AuthenticationError("Пользователь не найден")
-        from models.users import User as UserModel
-        user = UserModel.from_db_row(row)
+
+        user = self._repository.get_by_id_with_password(user_id)
         
+        if not user:
+            raise AuthenticationError("Пользователь не найден")
+                
         if not self._verify_password(old_password, user.password_hash):
             raise AuthenticationError("Неверный текущий пароль")
         
