@@ -56,9 +56,9 @@ class DepartmentRepository(BaseRepository[Department]):
         rows = self._db.fetch_all(query, tuple(params))
         departments = []
         for row in rows:
-            dept = Department.from_db_row(row[:5])
-            dept.manager_name = row[5] if len(row) > 5 else None
-            dept.employee_count = row[6] if len(row) > 6 else 0
+            dept = Department.from_db_row(row)
+            dept.manager_name = row.get('manager_name')
+            dept.employee_count = row.get('emp_count', 0) or 0
             departments.append(dept)
         return departments
 
@@ -75,8 +75,8 @@ class DepartmentRepository(BaseRepository[Department]):
         """
         row = self._db.fetch_one(query, (department_id,))
         if row:
-            dept = Department.from_db_row(row[:5])
-            dept.manager_name = row[5] if len(row) > 5 else None
+            dept = Department.from_db_row(row)
+            dept.manager_name = row.get('manager_name')
             return dept
         return None
 

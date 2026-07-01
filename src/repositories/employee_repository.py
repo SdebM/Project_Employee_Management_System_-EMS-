@@ -32,7 +32,7 @@ class EmployeeRepository(BaseRepository[Employee]):
     def __init__(self, db: Database):
         super().__init__(db, 'employees')
 
-    def _map_to_entity(self, row: tuple) -> Employee:
+    def _map_to_entity(self, row: dict) -> Employee:
         """Преобразует строку БД в объект Employee."""
         return Employee.from_db_row(row)
 
@@ -97,12 +97,16 @@ class EmployeeRepository(BaseRepository[Employee]):
         query += " ORDER BY e.last_name, e.first_name"
 
         rows = self._db.fetch_all(query, tuple(params))
-        employees = []
-        for row in rows:
-            emp = Employee.from_db_row(row[:15])
-            emp.department_name = row[15] if len(row) > 15 else None
-            employees.append(emp)
-        return employees
+
+        # employees = []
+        # for row in rows:
+        #     emp = Employee.from_db_row(row[:15])
+        #     emp.department_name = row[15] if len(row) > 15 else None
+        #     employees.append(emp)
+        # return employees
+        return [self._map_to_entity(row) for row in rows]
+
+
 
     def get_by_id(self, employee_id: int) -> Optional[Employee]:
         """Получает сотрудника по ID с полной информацией."""
@@ -119,11 +123,12 @@ class EmployeeRepository(BaseRepository[Employee]):
             WHERE e.employee_id = %s
         """
         row = self._db.fetch_one(query, (employee_id,))
-        if row:
-            emp = Employee.from_db_row(row[:15])
-            emp.department_name = row[15] if len(row) > 15 else None
-            return emp
-        return None
+        # if row:
+        #     emp = Employee.from_db_row(row[:15])
+        #     emp.department_name = row[15] if len(row) > 15 else None
+        #     return emp
+        # return None
+        return self._map_to_entity(row) if row else None
 
     def create(self, employee: Employee) -> int:
         """Создает нового сотрудника.
@@ -179,15 +184,15 @@ class EmployeeRepository(BaseRepository[Employee]):
         query = "DELETE FROM employees WHERE employee_id = %s"
         return self._db.execute_query(query, (employee_id,))
 
-    def get_next_id(self) -> int:
-        """Возвращает следующий доступный ID.
+    # def get_next_id(self) -> int:
+    #     """Возвращает следующий доступный ID.
         
-        Returns:
-            Следующий ID (MAX + 1)
-        """
-        query = "SELECT COALESCE(MAX(employee_id), 0) + 1 FROM employees"
-        result = self._db.fetch_one(query)
-        return result[0] if result else 1
+    #     Returns:
+    #         Следующий ID (MAX + 1)
+    #     """
+    #     query = "SELECT COALESCE(MAX(employee_id), 0) + 1 FROM employees"
+    #     result = self._db.fetch_one(query)
+    #     return result[0] if result else 1
 
     def get_by_department(self, department_id: int) -> List[Employee]:
         """Получает сотрудников указанного отдела.

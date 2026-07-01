@@ -65,37 +65,21 @@ class Department:
         }
 
     @classmethod
-    def from_db_row(cls, row: Union[tuple, Mapping]) -> 'Department':
-        """Создаёт экземпляр из строки БД.
-
-        Args:
-            row: Кортеж (позиционный доступ) или словарь
-                 (именованный доступ, например ``RealDictCursor``).
-
-                 Ожидаемый порядок для кортежа (SELECT * FROM departments)::
-
-                    0  department_id
-                    1  department_name
-                    2  manager_id
-                    3  created_at
-                    4  updated_at
-        """
-        if isinstance(row, Mapping):
-            return cls(
-                department_id=row.get('department_id'),
-                department_name=row.get('department_name', ''),
-                manager_id=row.get('manager_id'),
-                created_at=row.get('created_at'),
-                updated_at=row.get('updated_at'),
-            )
+    def from_db_row(cls, row: dict) -> 'Department':
+        """Создаёт экземпляр из строки БД (dict от RealDictCursor)."""
+        
         return cls(
-            department_id=row[0],
-            department_name=row[1],
-            manager_id=row[2] if len(row) > 2 else None,
-            created_at=row[3] if len(row) > 3 else None,
-            updated_at=row[4] if len(row) > 4 else None,
+            department_id=row.get('department_id'),
+            department_name=row.get('department_name', ''),
+            description=row.get('description'),
+            manager_id=row.get('manager_id'),
+            created_at=row.get('created_at'),
+            updated_at=row.get('updated_at'),
+            # Вспомогательные поля (из JOIN)
+            manager_name=row.get('manager_name'),
+            employee_count=row.get('employee_count', 0)
         )
-
+        
     
     def __str__(self) -> str:
         """Краткое строковое представление."""

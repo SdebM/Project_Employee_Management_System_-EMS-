@@ -125,54 +125,24 @@ class Project:
         }
 
     @classmethod
-    def from_db_row(cls, row: Union[tuple, Mapping]) -> 'Project':
-        """Создаёт экземпляр из строки БД.
-
-        Args:
-            row: Кортеж (позиционный доступ) или словарь
-                 (именованный доступ, например ``RealDictCursor``).
-
-                 Ожидаемый порядок для кортежа (SELECT * FROM projects)::
-
-                    0  project_id
-                    1  project_name
-                    2  description
-                    3  start_date
-                    4  end_date
-                    5  status
-                    6  budget
-                    7  department_id
-                    8  created_at
-                    9  updated_at
-        """
-        if isinstance(row, Mapping):
-            budget_raw = row.get('budget')
-            return cls(
-                project_id=row.get('project_id'),
-                project_name=row.get('project_name', ''),
-                description=row.get('description'),
-                start_date=row.get('start_date'),
-                end_date=row.get('end_date'),
-                status=row.get('status') or 'planning',
-                budget=Decimal(str(budget_raw)) if budget_raw is not None else None,
-                department_id=row.get('department_id'),
-                created_at=row.get('created_at'),
-                updated_at=row.get('updated_at'),
-            )
+    def from_db_row(cls, row: dict) -> 'Project':
+        """Создаёт экземпляр из строки БД (dict от RealDictCursor)."""
+        budget_raw = row.get('budget')
         return cls(
-            project_id=row[0],
-            project_name=row[1],
-            description=row[2] if len(row) > 2 else None,
-            start_date=row[3] if len(row) > 3 else None,
-            end_date=row[4] if len(row) > 4 else None,
-            status=row[5] if len(row) > 5 and row[5] else 'planning',
-            budget=(
-                Decimal(str(row[6])) if len(row) > 6 and row[6] is not None
-                else None
-            ),
-            department_id=row[7] if len(row) > 7 else None,
-            created_at=row[8] if len(row) > 8 else None,
-            updated_at=row[9] if len(row) > 9 else None,
+            project_id=row.get('project_id'),
+            project_name=row.get('project_name', ''),
+            description=row.get('description'),
+            start_date=row.get('start_date'),
+            end_date=row.get('end_date'),
+            status=row.get('status') or 'planning',
+            budget=Decimal(str(budget_raw)) if budget_raw is not None else None,
+            department_id=row.get('department_id'),
+            created_at=row.get('created_at'),
+            updated_at=row.get('updated_at'),
+            # Вспомогательные поля (из JOIN)
+            department_name=row.get('department_name')
+            # employee_ids обычно подгружается отдельным запросом, 
+            # поэтому здесь его нет, но если он появится в row, словарь его не сломает.
         )
 
     

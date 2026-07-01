@@ -84,11 +84,11 @@ class ProjectRepository(BaseRepository[Project]):
         projects = []
         for row in rows:
             try:
-                proj = Project.from_db_row(row[:10])
+                proj = Project.from_db_row(row)
             except Exception as e:
-                logging.error(f"Проект пропущен (id={row[0] if row and len(row)>0 else 'n/a'}): {e}")
+                logging.error(f"Проект пропущен (id={row.get('project_id') if row else 'n/a'}): {e}")
                 continue
-            proj.department_name = row[10] if len(row) > 10 else None
+            proj.department_name = row.get('department_name')
             projects.append(proj)
         return projects
 
@@ -108,11 +108,11 @@ class ProjectRepository(BaseRepository[Project]):
         row = self._db.fetch_one(query, (project_id,))
         if row:
             try:
-                proj = Project.from_db_row(row[:10])
+                proj = Project.from_db_row(row)
             except Exception as e:
                 logging.error(f"Ошибка при разборе проекта (id={project_id}): {e}")
                 return None
-            proj.department_name = row[10] if len(row) > 10 else None
+            proj.department_name = row.get('department_name')
             return proj
         return None
 

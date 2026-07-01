@@ -78,9 +78,9 @@ class SalaryRepository(BaseRepository[Salary]):
         rows = self._db.fetch_all(query, tuple(params))
         salaries = []
         for row in rows:
-            sal = Salary.from_db_row(row[:7])
-            sal.employee_name = row[7] if len(row) > 7 else None
-            sal.department_name = row[8] if len(row) > 8 else None
+            sal = Salary.from_db_row(row)
+            sal.employee_name = row.get('employee_name')
+            sal.department_name = row.get('department_name')
             salaries.append(sal)
         return salaries
 
@@ -98,8 +98,8 @@ class SalaryRepository(BaseRepository[Salary]):
         """
         row = self._db.fetch_one(query, (salary_id,))
         if row:
-            sal = Salary.from_db_row(row[:7])
-            sal.employee_name = row[7] if len(row) > 7 else None
+            sal = Salary.from_db_row(row)
+            sal.employee_name = row.get('employee_name')
             return sal
         return None
 
@@ -147,11 +147,18 @@ class SalaryRepository(BaseRepository[Salary]):
                 DATE_TRUNC('month', effective_date) as month,
                 SUM(salary_amount) as total
             FROM salaries
-            WHERE effective_date >= NOW() - INTERVAL '1 month' * %s
+            WHERE effective_date >= date_trunc('month', NOW()) - (%s * INTERVAL '1 month')
             GROUP BY month
             ORDER BY month
         """
-        return self._db.fetch_all(query, (months,))
+        rows = self._db.fetch_all(query, (months,))
+        return [
+            {
+                'month': row['month'].strftime('%Y-%m') if row['month'] else '',
+                'total': float(row['total']) if row['total'] else 0
+            }
+            for row in rows
+        ]
 
     def get_average_by_department(self) -> List[tuple]:
         """Возвращает среднюю зарплату по отделам.

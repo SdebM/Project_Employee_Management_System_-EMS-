@@ -13,6 +13,7 @@
 """
 
 import psycopg2
+from psycopg2.extras import RealDictCursor
 import logging
 from typing import Optional, List, Tuple, Any
 from contextlib import contextmanager
@@ -63,7 +64,15 @@ class Database:
                     host=db_config.host,
                     port=db_config.port
                 )
-                self.cursor = self.conn.cursor()
+            #     self.cursor = self.conn.cursor()
+            #     logging.info("Установлено соединение с базой данных.")
+            # except psycopg2.OperationalError as e:
+            #     logging.critical(f"Не удалось подключиться к БД: {str(e)}")
+            #     raise DatabaseError("Не удалось установить соединение с базой данных", str(e))
+            # except Exception as e:
+            #     logging.critical(f"Ошибка инициализации БД: {str(e)}")
+            #     raise DatabaseError("Ошибка инициализации подключения", str(e))
+                self.cursor = self.conn.cursor(cursor_factory=RealDictCursor)
                 logging.info("Установлено соединение с базой данных.")
             except psycopg2.OperationalError as e:
                 logging.critical(f"Не удалось подключиться к БД: {str(e)}")
@@ -136,7 +145,7 @@ class Database:
                 logging.error(f"Unexpected error: {str(e)}")
                 raise
 
-    def fetch_all(self, query: str, params: Optional[Tuple] = None) -> List[Tuple]:
+    def fetch_all(self, query: str, params: Optional[Tuple] = None) -> List[dict]:
         """Выполняет SELECT-запрос и возвращает все результаты.
 
         Args:
@@ -154,7 +163,7 @@ class Database:
             logging.error(f"Ошибка запроса: {str(e)}")
             raise DatabaseError(f"Ошибка выполнения запроса: {str(e)}")
         
-    def fetch_one(self, query: str, params: Optional[Tuple] = None) -> Optional[Tuple]:
+    def fetch_one(self, query: str, params: Optional[Tuple] = None) -> Optional[dict]:
         """Выполняет SELECT-запрос и возвращает одну строку.
 
         Args:

@@ -65,7 +65,7 @@ class AnalyticsService:
                 DATE_TRUNC('month', effective_date) as month,
                 SUM(salary_amount) as total
             FROM salaries
-            WHERE effective_date >= NOW() - (%s::text || ' months')::INTERVAL
+            WHERE effective_date >= date_trunc('month', NOW()) - (%s * INTERVAL '1 month')
             GROUP BY month
             ORDER BY month
         """
@@ -73,8 +73,8 @@ class AnalyticsService:
         rows = self._db.fetch_all(query, (months,))
         return [
             {
-                'month': row[0].strftime('%Y-%m') if row[0] else '',
-                'total': float(row[1]) if row[1] else 0
+                'month': row['month'].strftime('%Y-%m') if row['month'] else '',
+                'total': float(row['total']) if row['total'] else 0
             }
             for row in rows
         ]
@@ -170,7 +170,7 @@ class AnalyticsService:
                 DATE_TRUNC('month', hire_date) as month,
                 COUNT(*) as hired
             FROM employees
-            WHERE hire_date >= NOW() - (%s::text || ' months')::INTERVAL
+            WHERE hire_date >= date_trunc('month', NOW()) - (%s * INTERVAL '1 month')
             GROUP BY month
             ORDER BY month
         """
@@ -178,8 +178,8 @@ class AnalyticsService:
         rows = self._db.fetch_all(query, (months,))
         return [
             {
-                'month': row[0].strftime('%Y-%m') if row[0] else '',
-                'hired_count': row[1]
+                'month': row['month'].strftime('%Y-%m') if row['month'] else '',
+                'hired_count': row['hired']
             }
             for row in rows
         ]

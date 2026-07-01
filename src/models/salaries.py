@@ -98,47 +98,21 @@ class Salary:
         }
 
     @classmethod
-    def from_db_row(cls, row: Union[tuple, Mapping]) -> 'Salary':
-        """Создаёт экземпляр из строки БД.
-
-        Args:
-            row: Кортеж (позиционный доступ) или словарь
-                 (именованный доступ, например ``RealDictCursor``).
-
-                 Ожидаемый порядок столбцов для кортежа (SELECT * FROM salaries)::
-
-                    0  salary_id
-                    1  employee_id
-                    2  salary_amount
-                    3  effective_date
-                    4  payment_type
-                    5  description
-                    6  created_at
-                    7  updated_at
-        """
-        if isinstance(row, Mapping):
-            amount_raw = row.get('salary_amount')
-            return cls(
-                salary_id=row.get('salary_id'),
-                employee_id=row.get('employee_id', 0),
-                salary_amount=Decimal(str(amount_raw)) if amount_raw else Decimal("0.00"),
-                effective_date=row.get('effective_date'),
-                payment_type=row.get('payment_type') or 'salary',
-                description=row.get('description'),
-                created_at=row.get('created_at'),
-                updated_at=row.get('updated_at'),
-            )
+    def from_db_row(cls, row: dict) -> 'Salary':
+        """Создаёт экземпляр из строки БД (dict от RealDictCursor)."""
+        amount_raw = row.get('salary_amount')
         return cls(
-            salary_id=row[0],
-            employee_id=row[1],
-            salary_amount=(
-                Decimal(str(row[2])) if row[2] else Decimal("0.00")
-            ),
-            effective_date=row[3] if len(row) > 3 else None,
-            payment_type=row[4] if len(row) > 4 and row[4] else 'salary',
-            description=row[5] if len(row) > 5 else None,
-            created_at=row[6] if len(row) > 6 else None,
-            updated_at=row[7] if len(row) > 7 else None,
+            salary_id=row.get('salary_id'),
+            employee_id=row.get('employee_id', 0),
+            salary_amount=Decimal(str(amount_raw)) if amount_raw else Decimal("0.00"),
+            effective_date=row.get('effective_date'),
+            payment_type=row.get('payment_type') or 'salary',
+            description=row.get('description'),
+            created_at=row.get('created_at'),
+            updated_at=row.get('updated_at'),
+            # Вспомогательные поля (из JOIN)
+            employee_name=row.get('employee_name'),
+            department_name=row.get('department_name')
         )
 
     

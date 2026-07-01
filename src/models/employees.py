@@ -161,60 +161,26 @@ class Employee:
         return ' | '.join(parts)
 
     @classmethod
-    def from_db_row(cls, row: Union[tuple, Mapping]) -> 'Employee':
+    def from_db_row(cls, row: dict) -> 'Employee':
         """Создает экземпляр из строки БД.
-
-        Args:
-            row: Кортеж (позиционный доступ) или словарь
-                 (именованный доступ, например ``RealDictCursor``).
-
-                 Порядок столбцов для кортежа:
-                 (employee_id, first_name, last_name, date_of_birth, gender,
-                  hire_date, department_id, phone, email, inn, snils, passport,
-                  status, created_at, updated_at)
-
-        Returns:
-            Новый экземпляр Employee.
-
-        Note:
-            Метод устойчив к неполным кортежам — отсутствующие
-            поля получат значения по умолчанию.
+        
         """
-        if isinstance(row, Mapping):
-            return cls(
-                employee_id=row.get('employee_id'),
-                first_name=row.get('first_name', ''),
-                last_name=row.get('last_name', ''),
-                date_of_birth=row.get('date_of_birth'),
-                gender=row.get('gender', 'М'),
-                hire_date=row.get('hire_date'),
-                department_id=row.get('department_id'),
-                phone=row.get('phone'),
-                email=row.get('email'),
-                inn=row.get('inn'),
-                snils=row.get('snils'),
-                passport=row.get('passport'),
-                status=row.get('status', 'active'),
-                created_at=row.get('created_at'),
-                updated_at=row.get('updated_at'),
-            )
-        n = len(row)
         return cls(
-            employee_id=row[0],
-            first_name=row[1],
-            last_name=row[2],
-            date_of_birth=row[3],
-            gender=row[4],
-            hire_date=row[5],
-            department_id=row[6] if n > 6 else None,
-            phone=row[7] if n > 7 else None,
-            email=row[8] if n > 8 else None,
-            inn=row[9] if n > 9 else None,
-            snils=row[10] if n > 10 else None,
-            passport=row[11] if n > 11 else None,
-            status=row[12] if n > 12 else 'active',
-            created_at=row[13] if n > 13 else None,
-            updated_at=row[14] if n > 14 else None,
+            employee_id=row.get('employee_id'),
+            first_name=row.get('first_name', ''),
+            last_name=row.get('last_name', ''),
+            date_of_birth=row.get('date_of_birth'),
+            gender=row.get('gender', 'М'),
+            hire_date=row.get('hire_date'),
+            department_id=row.get('department_id'),
+            phone=row.get('phone'),
+            email=row.get('email'),
+            inn=row.get('inn'),
+            snils=row.get('snils'),
+            passport=row.get('passport'),
+            status=row.get('status', 'active'),
+            created_at=row.get('created_at'),
+            updated_at=row.get('updated_at'),
+            department_name=row.get('department_name') # Для JOIN полей
         )
-    
-
+        

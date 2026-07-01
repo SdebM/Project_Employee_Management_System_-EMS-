@@ -126,44 +126,18 @@ class User:
         }
 
     @classmethod
-    def from_db_row(cls, row: Union[tuple, Mapping]) -> 'User':
-        """Создаёт экземпляр из строки БД.
-
-        Args:
-            row: Кортеж (позиционный доступ) или словарь
-                 (именованный доступ, например ``RealDictCursor``).
-
-                 Ожидаемый порядок для кортежа (SELECT * FROM users)::
-
-                    0  id
-                    1  username
-                    2  password_hash
-                    3  role
-                    4  department_id
-                    5  is_active
-                    6  created_at
-                    7  last_login
-        """
-        if isinstance(row, Mapping):
-            return cls(
-                id=row.get('id'),
-                username=row.get('username', ''),
-                password_hash=row.get('password_hash', ''),
-                role=row.get('role', 'employee'),
-                department_id=row.get('department_id'),
-                is_active=row.get('is_active', True),
-                created_at=row.get('created_at'),
-                last_login=row.get('last_login'),
-            )
+    def from_db_row(cls, row: dict) -> 'User':
+        """Создаёт экземпляр из строки БД (dict от RealDictCursor)."""
         return cls(
-            id=row[0],
-            username=row[1] if len(row) > 1 else "",
-            password_hash=row[2] if len(row) > 2 else "",
-            role=row[3] if len(row) > 3 else "employee",
-            department_id=row[4] if len(row) > 4 else None,
-            is_active=row[5] if len(row) > 5 else True,
-            created_at=row[6] if len(row) > 6 else None,
-            last_login=row[7] if len(row) > 7 else None,
+            id=row.get('id'),
+            username=row.get('username', ''),
+            # Если запрос безопасный (без хеша), подставится пустая строка
+            password_hash=row.get('password_hash', ''), 
+            role=row.get('role', 'employee'),
+            department_id=row.get('department_id'),
+            is_active=row.get('is_active', True),
+            created_at=row.get('created_at'),
+            last_login=row.get('last_login')
         )
 
     
