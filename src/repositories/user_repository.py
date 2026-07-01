@@ -74,7 +74,7 @@ class UserRepository(BaseRepository[User]):
             )
             users.append(user)
         return users
-
+    
     def get_by_id(self, user_id: int) -> Optional[User]:
         """Получает пользователя по ID."""
         query = """
@@ -94,6 +94,16 @@ class UserRepository(BaseRepository[User]):
                 created_at=row[5] if len(row) > 5 else None,
             )
         return None
+    
+    def get_by_id_with_password(self, user_id: int) -> Optional[User]:
+        """Получает пользователя по ID с хешем пароля (для аутентификации)."""
+        query = """
+            SELECT id, username, password_hash, role, department_id, is_active, created_at, last_login
+            FROM users 
+            WHERE id = %s
+        """
+        row = self._db.fetch_one(query, (user_id,))
+        return User.from_db_row(row) if row else None
 
     def get_by_username(self, username: str) -> Optional[User]:
         """Получает пользователя по логину (с паролем для аутентификации).
