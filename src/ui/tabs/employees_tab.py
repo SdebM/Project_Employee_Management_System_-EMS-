@@ -333,5 +333,7 @@ class EmployeesTabNew(BaseTab):
         except Exception as e:
             logging.error(f"Ошибка просмотра: {e}")
 
-    def _get_export_filename(self, extension: str) -> str: return f"employees.{extension}"
-    def _get_export_title(self) -> str: return "Список сотрудников"
+    def _get_export_filename(self, extension: str) -> str: 
+        return f"employees.{extension}"
+    def _get_export_title(self) -> str: 
+        return "Список сотрудников"
