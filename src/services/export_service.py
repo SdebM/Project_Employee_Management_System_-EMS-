@@ -10,7 +10,7 @@ from reportlab.platypus import (
     Table,
     TableStyle,
     Paragraph,
-    Spacer,
+    Spacer
 )
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -27,26 +27,15 @@ class PDFExporter:
     """Класс для экспорта данных таблицы в PDF-формат."""
 
     @staticmethod
-    def export_to_pdf(parent, table_widget, default_filename, document_title) -> bool:
-        try:
-            if table_widget.rowCount() == 0:
-                QMessageBox.warning(parent, "Ошибка", "Нет данных для экспорта")
-                return False
+    def export_to_pdf(table_widget: QTableWidget, file_path: str, document_title: str) -> bool:
+        if table_widget.rowCount() == 0:
+                raise ValueError("Нет данных для экспорта")
 
-            font_name = PDFExporter.register_fonts()
-            styles = PDFExporter.create_styles(font_name)
-            headers, table_data = PDFExporter.prepare_data(table_widget, styles)
+        font_name = PDFExporter.register_fonts()
+        styles = PDFExporter.create_styles(font_name)
+        headers, table_data = PDFExporter.prepare_data(table_widget, styles)
 
-            file_path, _ = QFileDialog.getSaveFileName(
-                parent,
-                "Экспорт в PDF",
-                default_filename,
-                "PDF Files (*.pdf)"
-            )
-            if not file_path:
-                return False
-
-            doc = SimpleDocTemplate(
+        doc = SimpleDocTemplate(
                 file_path,
                 pagesize=landscape(A4),
                 leftMargin=10 * mm,
@@ -55,36 +44,20 @@ class PDFExporter:
                 bottomMargin=15 * mm
             )
 
-            elements = []
-            elements.append(Paragraph(document_title, styles['Title']))
-            elements.append(Spacer(1, 0.2 * 25.4))
+        elements = []
+        elements.append(Paragraph(document_title, styles['Title']))
+        elements.append(Spacer(1, 0.2 * 25.4))
 
-            table = Table(
-                table_data,
-                colWidths=PDFExporter.calculate_column_widths(len(headers))
-            )
-            table.setStyle(PDFExporter.create_table_style(font_name))
+        table = Table(
+            table_data,
+            colWidths=PDFExporter.calculate_column_widths(len(headers))
+        )
+        table.setStyle(PDFExporter.create_table_style(font_name))
 
-            elements.append(table)
-            doc.build(elements)
+        elements.append(table)
+        doc.build(elements)
 
-            QMessageBox.information(
-                parent,
-                "Успех",
-                f"PDF-документ успешно сохранен:\n{file_path}"
-            )
-            return True
-
-        except PermissionError:
-            error_msg = "Нет прав для записи в выбранную директорию"
-            logging.error(error_msg)
-            QMessageBox.critical(parent, "Ошибка", error_msg)
-            return False
-        except Exception as e:
-            logging.error(f"PDF Export Error: {str(e)}")
-            QMessageBox.critical(parent, "Ошибка", f"Не удалось создать PDF:\n{str(e)}")
-            return False
-
+            
     @staticmethod
     def prepare_data(table_widget, styles):
         def format_text(text, is_header=False):
@@ -186,64 +159,27 @@ class ExcelExporter:
     """Класс для экспорта данных таблицы в Excel-формат."""
 
     @staticmethod
-    def export_to_excel(parent, table_widget, default_filename, sheet_name="Данные") -> bool:
-        try:
-            if table_widget.rowCount() == 0:
-                QMessageBox.warning(parent, "Ошибка", "Нет данных для экспорта")
-                return False
+    def export_to_excel(table_widget: QTableWidget, file_path: str, sheet_name: str = "Данные") -> bool:
+        """Экспортирует данные в Excel. Выбрасывает исключения при ошибках."""
+        if table_widget.rowCount() == 0:
+            raise ValueError("Нет данных для экспорта")
 
-            headers = [
-                table_widget.horizontalHeaderItem(i).text()
-                for i in range(table_widget.columnCount())
-            ]
+        headers = [table_widget.horizontalHeaderItem(i).text() for i in range(table_widget.columnCount())]
+        data = []
+        for row in range(table_widget.rowCount()):
+            row_data = [table_widget.item(row, col).text() if table_widget.item(row, col) else "" for col in range(table_widget.columnCount())]
+            data.append(row_data)
 
-            data = []
-            for row in range(table_widget.rowCount()):
-                row_data = []
-                for col in range(table_widget.columnCount()):
-                    item = table_widget.item(row, col)
-                    row_data.append(item.text() if item else "")
-                data.append(row_data)
-
-            df = pd.DataFrame(data, columns=headers)
-
-            file_path, _ = QFileDialog.getSaveFileName(
-                parent,
-                "Экспорт в Excel",
-                default_filename,
-                "Excel Files (*.xlsx)"
-            )
-            if not file_path:
-                return False
-
-            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
-                df.to_excel(writer, sheet_name=sheet_name, index=False)
-
-            QMessageBox.information(
-                parent,
-                "Успех",
-                f"Данные успешно экспортированы в файл:\n{file_path}"
-            )
-            return True
-
-        except PermissionError:
-            error_msg = "Нет прав для записи в выбранную директорию"
-            logging.error(error_msg)
-            QMessageBox.critical(parent, "Ошибка", error_msg)
-            return False
-        except Exception as e:
-            logging.error(f"Excel Export Error: {str(e)}")
-            QMessageBox.critical(
-                parent,
-                "Ошибка",
-                f"Не удалось экспортировать данные:\n{str(e)}"
-            )
-            return False
+        df = pd.DataFrame(data, columns=headers)
+        with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+        return True
 
 
 class ExportService:
     @staticmethod
     def check_export_permission(user: dict) -> bool:
+        from core.permissions import Permission, check_permission
         try:
             check_permission(user, Permission.EXPORT_DATA)
             return True
@@ -251,9 +187,9 @@ class ExportService:
             return False
 
     @staticmethod
-    def export_to_pdf(parent: QWidget, table_widget: QTableWidget, default_filename: str, document_title: str) -> bool:
-        return PDFExporter.export_to_pdf(parent, table_widget, default_filename, document_title)
+    def export_to_pdf(table_widget: QTableWidget, file_path: str, document_title: str) -> bool:
+        return PDFExporter.export_to_pdf(table_widget, file_path, document_title)
 
     @staticmethod
-    def export_to_excel(parent: QWidget, table_widget: QTableWidget, default_filename: str, sheet_name: str = "Данные") -> bool:
-        return ExcelExporter.export_to_excel(parent, table_widget, default_filename, sheet_name)
+    def export_to_excel(table_widget: QTableWidget, file_path: str, sheet_name: str = "Данные") -> bool:
+        return ExcelExporter.export_to_excel(table_widget, file_path, sheet_name)
