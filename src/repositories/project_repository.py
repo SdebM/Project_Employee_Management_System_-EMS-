@@ -10,6 +10,10 @@ import logging
 class ProjectRepository(BaseRepository[Project]):
     """Репозиторий для CRUD-операций с проектами."""
 
+    soft_delete_column = 'is_active'
+    soft_delete_value = False
+    active_value = True
+
     def __init__(self, db: Database):
         super().__init__(db, 'projects')
 
