@@ -9,6 +9,10 @@ from core.database import Database
 class UserRepository(BaseRepository[User]):
     """Репозиторий для CRUD-операций с пользователями."""
 
+    soft_delete_column = 'is_active'
+    soft_delete_value = False
+    active_value = True
+
     def __init__(self, db: Database):
         super().__init__(db, 'users')
 
