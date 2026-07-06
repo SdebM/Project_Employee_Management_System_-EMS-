@@ -1,25 +1,17 @@
-"""Вкладка сотрудников.
-
-Пример реализации вкладки с разделением слоёв:
-- UI отвечает только за отображение
-- Бизнес-логика в EmployeeService
-- Данные через EmployeeRepository
-"""
-
 from typing import Optional, List
 from datetime import datetime, date
 import logging
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
-    QTableWidgetItem, QHeaderView, QLineEdit, QComboBox, QLabel,
-    QMessageBox, QDialog, QFormLayout, QDialogButtonBox
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
+    QTableWidget, QTableWidgetItem, QHeaderView,
+    QLineEdit, QComboBox, QLabel, QMessageBox, QDialog,
+    QFormLayout, QDialogButtonBox
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 
 from ui.base_tab import BaseTab
-from ui.widgets import DataTableWidget, SearchPanel, ExportPanel, ControlPanel
 from services.employee_service import EmployeeService
 from services.department_service import DepartmentService
 from core.permissions import Permission
@@ -27,7 +19,6 @@ from core.exceptions import ValidationError, EntityNotFoundError, PermissionDeni
 from models.employees import Employee
 from styles import TABLE_STYLES, BUTTON_STYLES
 from utils.formatters import Formatters
-
 
 
 class EmployeeDialog(QDialog):
@@ -119,34 +110,19 @@ class EmployeeDialog(QDialog):
 
 
 class EmployeesTabNew(BaseTab):
-    """Вкладка управления сотрудниками (новая архитектура).
-    
-    Использует:
-    - EmployeeService для бизнес-логики
-    - BaseTab для общего функционала
-    - Компоненты из ui.widgets
-    """
-    
+    DELETE_ACTION_TEXT = "Уволить"
+    DELETE_CONFIRM_TITLE = "Увольнение сотрудника"
+    DELETE_CONFIRM_MESSAGE = "Вы уверены, что хотите уволить сотрудника с ID {id}?\nЗапись будет помечена как уволенная и скрыта из списка."
+
     BUTTON_PERMISSIONS = {
         'btn_add': Permission.CREATE_EMPLOYEE,
         'btn_edit': Permission.EDIT_EMPLOYEE,
-        'btn_delete': Permission.DELETE_EMPLOYEE,
+        'btn_delete': Permission.DELETE_EMPLOYEE, # Привязка права к кнопке "Уволить"
         'btn_export_excel': Permission.EXPORT_DATA,
         'btn_export_pdf': Permission.EXPORT_DATA,
     }
 
-    def __init__(
-        self, 
-        employee_service: EmployeeService,
-        department_service: DepartmentService,
-        user: dict
-    ):
-        """
-        Args:
-            employee_service: Сервис работы с сотрудниками
-            department_service: Сервис работы с отделами
-            user: Данные текущего пользователя
-        """
+    def __init__(self, employee_service: EmployeeService, department_service: DepartmentService, user: dict):
         super().__init__(employee_service, user)
         self.employee_service = employee_service
         self.department_service = department_service
@@ -156,7 +132,6 @@ class EmployeesTabNew(BaseTab):
         self.load_data()
 
     def init_ui(self):
-        """Инициализирует интерфейс вкладки."""
         main_layout = QVBoxLayout()
         main_layout.addLayout(self._create_control_panel())
         main_layout.addLayout(self._create_search_panel())
@@ -167,14 +142,15 @@ class EmployeesTabNew(BaseTab):
         self._connect_signals()
 
     def _create_control_panel(self) -> QHBoxLayout:
-        """Создает панель с кнопками управления."""
         panel = QHBoxLayout()
         self.btn_add = QPushButton("Добавить")
         self.btn_edit = QPushButton("Редактировать")
-        self.btn_delete = QPushButton("Удалить")
-        for btn in [self.btn_add, self.btn_edit, self.btn_delete]:
-            btn.setStyleSheet(BUTTON_STYLES.get("secondary", ""))
+        self.btn_delete = QPushButton(self.DELETE_ACTION_TEXT)
+        
         self.btn_add.setStyleSheet(BUTTON_STYLES.get("primary", ""))
+        self.btn_edit.setStyleSheet(BUTTON_STYLES.get("secondary", ""))
+        self.btn_delete.setStyleSheet(BUTTON_STYLES.get("danger", "")) # Красная кнопка для увольнения
+        
         panel.addWidget(self.btn_add)
         panel.addWidget(self.btn_edit)
         panel.addWidget(self.btn_delete)
@@ -182,7 +158,6 @@ class EmployeesTabNew(BaseTab):
         return panel
 
     def _create_search_panel(self) -> QHBoxLayout:
-        """Создает панель поиска."""
         panel = QHBoxLayout()
         self.search_first_name = QLineEdit()
         self.search_first_name.setPlaceholderText("Имя")
@@ -198,9 +173,8 @@ class EmployeesTabNew(BaseTab):
         return panel
 
     def _create_table(self) -> QTableWidget:
-        """Создает таблицу сотрудников."""
         table = QTableWidget()
-        columns = ["ID", "Имя", "Фамилия", "Дата рождения", "Пол", "Дата приема", "Отдел", "Статус", "Дата создания", "Дата обновления"]
+        columns = ["ID", "Имя", "Фамилия", "Дата рождения", "Пол", "Дата приема", "Отдел", "Статус"]
         table.setColumnCount(len(columns))
         table.setHorizontalHeaderLabels(columns)
         header = table.horizontalHeader()
@@ -215,7 +189,6 @@ class EmployeesTabNew(BaseTab):
         return table
 
     def _create_bottom_panel(self) -> QHBoxLayout:
-        """Создает нижнюю панель с кнопками."""
         panel = QHBoxLayout()
         self.btn_refresh = QPushButton()
         self.btn_refresh.setIcon(QIcon.fromTheme("view-refresh"))
@@ -232,7 +205,6 @@ class EmployeesTabNew(BaseTab):
         return panel
 
     def _connect_signals(self):
-        """Подключает сигналы к слотам."""
         self.btn_add.clicked.connect(self.add_employee)
         self.btn_edit.clicked.connect(self.edit_employee)
         self.btn_delete.clicked.connect(self.delete_employee)
@@ -245,7 +217,6 @@ class EmployeesTabNew(BaseTab):
         self.main_table.doubleClicked.connect(self.show_employee_details)
 
     def _load_departments(self):
-        """Загружает отделы в комбобокс."""
         try:
             departments = self.department_service.get_departments_for_dropdown()
             self.department_combo.clear()
@@ -256,24 +227,20 @@ class EmployeesTabNew(BaseTab):
             logging.error(f"Ошибка загрузки отделов: {e}")
 
     def load_data(self):
-        """Загружает список сотрудников из сервиса."""
-        try:
-            filters = {}
-            if self.search_first_name.text().strip(): filters['first_name'] = self.search_first_name.text().strip()
-            if self.search_last_name.text().strip(): filters['last_name'] = self.search_last_name.text().strip()
-            if self.department_combo.currentData(): filters['department_id'] = self.department_combo.currentData()
-            
-            employees = self.employee_service.get_employees(self.user, filters)
-            self._populate_table(employees)
-        except PermissionDeniedError as e:
-            self.show_error("Доступ запрещен", str(e))
-        except Exception as e:
-            logging.error(f"Ошибка загрузки сотрудников: {e}")
-            self.show_error("Ошибка", "Не удалось загрузить список сотрудников")
+        filters = {}
+        if self.search_first_name.text().strip(): filters['first_name'] = self.search_first_name.text().strip()
+        if self.search_last_name.text().strip(): filters['last_name'] = self.search_last_name.text().strip()
+        if self.department_combo.currentData(): filters['department_id'] = self.department_combo.currentData()
 
+        def fetch_task():
+            return self.employee_service.get_employees(self.user, filters)
+
+        def on_success(employees):
+            self._populate_table(employees)
+
+        self.run_in_background(fetch_task, on_success)
 
     def _populate_table(self, employees: List[Employee]):
-        """Заполняет таблицу данными."""
         self.main_table.setRowCount(len(employees))
         for row, emp in enumerate(employees):
             self.main_table.setItem(row, 0, QTableWidgetItem(str(emp.employee_id)))
@@ -284,14 +251,11 @@ class EmployeesTabNew(BaseTab):
             self.main_table.setItem(row, 5, QTableWidgetItem(Formatters.format_date(emp.hire_date)))
             self.main_table.setItem(row, 6, QTableWidgetItem(emp.department_name or ""))
             self.main_table.setItem(row, 7, QTableWidgetItem(Formatters.format_status(emp.status)))
-            self.main_table.setItem(row, 8, QTableWidgetItem(Formatters.format_datetime(emp.created_at)))
-            self.main_table.setItem(row, 9, QTableWidgetItem(Formatters.format_datetime(emp.updated_at)))
             for col in range(self.main_table.columnCount()):
                 item = self.main_table.item(row, col)
                 if item: item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
     def add_employee(self):
-        """Открывает диалог добавления сотрудника."""
         try:
             departments = self.department_service.get_departments_for_dropdown()
             dialog = EmployeeDialog(self, departments)
@@ -309,7 +273,6 @@ class EmployeesTabNew(BaseTab):
             self.show_error("Ошибка", "Не удалось добавить сотрудника")
 
     def edit_employee(self):
-        """Открывает диалог редактирования сотрудника."""
         employee_id = self.get_selected_row_id()
         if not employee_id: return
         try:
@@ -331,24 +294,26 @@ class EmployeesTabNew(BaseTab):
             self.show_error("Ошибка", "Не удалось обновить данные")
 
     def delete_employee(self):
-        """Удаляет выбранного сотрудника."""
         employee_id = self.get_selected_row_id()
         if not employee_id: return
-        if not self.confirm_action("Подтверждение", f"Вы уверены, что хотите удалить сотрудника с ID {employee_id}?"): return
+        
+        if not self.confirm_delete(employee_id): return
+        
         try:
+            # Сервис вызывает repository.delete(), 
+            # а репозиторий меняет статус на 'fired'
             self.employee_service.delete_employee(self.user, employee_id)
-            self.show_info("Успех", "Сотрудник удален")
+            self.show_info("Успех", "Сотрудник уволен")
             self.load_data()
         except EntityNotFoundError:
             self.show_error("Ошибка", "Сотрудник не найден")
         except PermissionDeniedError as e:
             self.show_error("Доступ запрещен", str(e))
         except Exception as e:
-            logging.error(f"Ошибка удаления: {e}")
-            self.show_error("Ошибка", "Не удалось удалить сотрудника")
+            logging.error(f"Ошибка увольнения: {e}")
+            self.show_error("Ошибка", "Не удалось уволить сотрудника")
 
     def show_employee_details(self):
-        """Показывает детальную информацию о сотруднике через QMessageBox."""
         employee_id = self.get_selected_row_id()
         if not employee_id: return
         try:
@@ -368,8 +333,5 @@ class EmployeesTabNew(BaseTab):
         except Exception as e:
             logging.error(f"Ошибка просмотра: {e}")
 
-    def _get_export_filename(self, extension: str) -> str:
-        return f"employees.{extension}"
-
-    def _get_export_title(self) -> str:
-        return "Список сотрудников"
+    def _get_export_filename(self, extension: str) -> str: return f"employees.{extension}"
+    def _get_export_title(self) -> str: return "Список сотрудников"
