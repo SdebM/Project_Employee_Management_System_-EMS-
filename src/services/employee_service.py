@@ -226,10 +226,6 @@ class EmployeeService:
         
         return result
 
-    # def get_next_employee_id(self) -> int:
-    #     """Возвращает следующий доступный ID."""
-    #     return self._repository.get_next_id()
-
     def get_employee_count_by_department(self) -> List[tuple]:
         """Возвращает статистику по отделам."""
         return self._repository.count_by_department()
@@ -254,18 +250,11 @@ class EmployeeService:
         # Валидация возраста
         if data.get('date_of_birth') and data.get('hire_date'):
             age_at_hire = self._calculate_age(data['date_of_birth'], data['hire_date'])
-            # if age_at_hire < 18:
-                # raise ValidationError(
-                #     "Сотруднику должно быть не менее 18 лет на момент приема",
-                #     "date_of_birth"
-                # )
             is_valid, msg = Validators.validate_age(data['date_of_birth'], min_age=18)
             if not is_valid:
                 raise ValidationError(msg, "date_of_birth")
         
         # Валидация email
-        # if data.get('email') and '@' not in data['email']:
-        #     raise ValidationError("Некорректный формат email", "email")
         if data.get('email'):
             is_valid, msg = Validators.validate_email(data['email'])
             if not is_valid:
