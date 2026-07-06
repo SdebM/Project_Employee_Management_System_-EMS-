@@ -870,3 +870,12 @@ VALUES ('employee', '333', 'employee', '5');
 UPDATE user SET
 password_hash = '123'
 WHERE id = 9;
+
+-- Добавляем флаг активности для отделов
+ALTER TABLE departments ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- Добавляем флаг активности для зарплат (финансовые данные нельзя удалять никогда)
+ALTER TABLE salaries ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- добавить is_active для удобства, если нужно скрывать завершенные проекты.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
